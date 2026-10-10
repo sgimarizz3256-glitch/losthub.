@@ -1,4 +1,4 @@
---// LOST HUB v5 | ULTRA UPDATE | Gray & Black Edition
+--// LOST HUB v5.1 | ULTRA UPDATE | Gray & Black Edition
 --// Loading novo, tela de key nova (lembrar key, tentativas, bloqueio),
 --// mais opcoes em cada jogo, novos jogos (Booga Booga, Bee Swarm, Build A Boat),
 --// alerta de inimigo, anti void, auto rejoin, auto server hop e muito mais.
@@ -309,16 +309,98 @@ do
         Orbs[i] = o
     end
 
-    local Skull = new("TextLabel", {
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.new(0, 0, 0, LOGO_Y),
-        Size = UDim2.new(0, 120, 0, 120),
-        BackgroundTransparency = 1,
-        Text = "☠",
-        TextColor3 = C.white,
-        TextSize = 78,
-        Font = Enum.Font.GothamBlack,
-    }, Stage)
+    -- caveira desenhada em UI (ossos, olhos brilhando, mandibula animada)
+    local function makeSkull(parent, cx, cy)
+        local bone = Color3.fromRGB(228, 226, 220)
+        local boneDark = Color3.fromRGB(165, 163, 158)
+        local ink = Color3.fromRGB(6, 6, 8)
+        local group = new("Frame", {
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(0, cx, 0, cy),
+            Size = UDim2.fromOffset(150, 172),
+            BackgroundTransparency = 1,
+        }, parent)
+        local scale = new("UIScale", {Scale = 1}, group)
+
+        local function box(x, y, w, h, col, r, par)
+            local f = new("Frame", {
+                Position = UDim2.fromOffset(x, y),
+                Size = UDim2.fromOffset(w, h),
+                BackgroundColor3 = col,
+                BorderSizePixel = 0,
+            }, par or group)
+            if r then corner(f, r) end
+            return f
+        end
+        local function grad(f, c1, c2)
+            new("UIGradient", {
+                Rotation = 90,
+                Color = ColorSequence.new({ColorSequenceKeypoint.new(0, c1), ColorSequenceKeypoint.new(1, c2)}),
+            }, f)
+        end
+
+        -- macas do rosto e dentes de cima
+        local cheek = box(26, 82, 98, 56, boneDark, 24)
+        grad(cheek, bone, boneDark)
+        local upperGum = box(38, 120, 74, 16, ink, 5)
+        for i = 0, 5 do
+            box(40 + i * 11.8, 121, 9.6, 14, bone, 3)
+        end
+
+        -- cranio
+        local cranium = box(10, 0, 130, 114, bone, 58)
+        grad(cranium, Color3.fromRGB(240, 238, 232), Color3.fromRGB(176, 174, 168))
+        stroke(cranium, ink, 2, 0.1)
+        local crack1 = box(96, 4, 2, 34, ink, 1)
+        crack1.Rotation = 24
+        crack1.BackgroundTransparency = 0.25
+        local crack2 = box(101, 30, 2, 22, ink, 1)
+        crack2.Rotation = -32
+        crack2.BackgroundTransparency = 0.35
+
+        -- orbitas + brilho dos olhos
+        local pupils, halos = {}, {}
+        for i, x in ipairs({30, 80}) do
+            local socket = box(x, 54, 40, 46, ink, 21)
+            stroke(socket, Color3.fromRGB(70, 70, 74), 3, 0.2)
+            halos[i] = box(7, 14, 26, 26, C.white, 13, socket)
+            halos[i].BackgroundTransparency = 0.82
+            pupils[i] = box(14, 21, 12, 12, C.white, 6, socket)
+        end
+
+        -- nariz
+        local nose = box(69, 99, 12, 12, ink, 2)
+        nose.Rotation = 45
+
+        -- mandibula
+        local jaw = box(36, 134, 78, 34, boneDark, 15)
+        grad(jaw, bone, Color3.fromRGB(120, 118, 114))
+        stroke(jaw, ink, 2, 0.1)
+        box(7, 0, 64, 14, ink, 4, jaw)
+        for i = 0, 4 do
+            box(9 + i * 12.6, 2, 10, 11, bone, 3, jaw)
+        end
+
+        return {group = group, scale = scale, jaw = jaw, pupils = pupils, halos = halos, glitch = 0, cx = cx, cy = cy}
+    end
+
+    local function animateSkull(sk, now)
+        local open = (math.sin(now * 2.4) + 1) / 2
+        sk.jaw.Position = UDim2.fromOffset(36, 134 + open * 6)
+        local glow = (math.sin(now * 3) + 1) / 2
+        for i = 1, 2 do
+            sk.pupils[i].BackgroundTransparency = 0.05 + glow * 0.4
+            sk.halos[i].BackgroundTransparency = 0.9 - glow * 0.25
+        end
+        if math.random() < 0.012 then
+            sk.glitch = now + 0.09
+        end
+        local jx = now < sk.glitch and math.random(-5, 5) or 0
+        sk.group.Position = UDim2.new(0, sk.cx + jx, 0, sk.cy + math.sin(now * 2) * 4)
+        sk.group.Rotation = math.sin(now * 1.6) * 5 + (jx ~= 0 and math.random(-4, 4) or 0)
+    end
+
+    local Skull = makeSkull(Stage, 0, LOGO_Y)
 
     -- titulo letra por letra
     local TITLE = "LOST HUB"
@@ -344,7 +426,7 @@ do
         Position = UDim2.new(0, 0, 0, 148),
         Size = UDim2.fromOffset(190, 16),
         BackgroundTransparency = 1,
-        Text = "V5  •  ULTRA UPDATE",
+        Text = "V5.1  •  ULTRA UPDATE",
         TextColor3 = C.sub,
         TextSize = 11,
         Font = Enum.Font.GothamBold,
@@ -464,8 +546,7 @@ do
             Ring2.Rotation = Ring2.Rotation - 1.7
             Ring3.Rotation = Ring3.Rotation + 1.0
             Ring4.Rotation = Ring4.Rotation - 0.6
-            Skull.Rotation = math.sin(now * 2) * 8
-            Skull.TextSize = 78 + math.floor(pulse * 4)
+            animateSkull(Skull, now)
             CircleStroke.Transparency = 0.2 + math.abs(pulse) * 0.3
 
             for i, o in ipairs(Orbs) do
@@ -541,7 +622,7 @@ do
     local ShockStroke = stroke(Shock, C.white, 3, 0)
     tween(Shock, 0.8, {Size = UDim2.new(0, 2200, 0, 2200)}, Enum.EasingStyle.Quad)
     tween(ShockStroke, 0.8, {Transparency = 1})
-    tween(Skull, 0.4, {TextSize = 150})
+    tween(Skull.scale, 0.45, {Scale = 1.5}, Enum.EasingStyle.Back)
     tween(StageScale, 0.5, {Scale = StageScale.Scale * 1.12})
     fadeAll(Stage, 0.4)
     task.wait(0.45)
@@ -4691,6 +4772,88 @@ do
                     end)
                     UI.Toggle(page, "Gravidade baixa (50)", false, function(on)
                         workspace.Gravity = on and 50 or OrigGravity
+                    end)
+                end,
+            })},
+        {Name = "Flee the Facility", Desc = "ESP da Fera, computadores, saidas, alertas e sobrevivencia",
+            Ids = {893973440}, Keys = {"flee the facility"},
+            Build = builder({
+                info = "Ache a Fera (quem esta com o Hammer), hackeie computadores e fuja. Nomes de objetos podem variar.", infoH = 30,
+                groups = {
+                    {"Computadores", {"computer"}}, {"Saidas", {"exit"}},
+                    {"Cabines de congelamento", {"freezepod", "freeze pod", "pod"}},
+                },
+                custom = function(page)
+                    local function findBeast()
+                        for _, pl in ipairs(Players:GetPlayers()) do
+                            local c = pl.Character
+                            local bp = pl:FindFirstChild("Backpack")
+                            if pl ~= LocalPlayer and ((c and c:FindFirstChild("Hammer")) or (bp and bp:FindFirstChild("Hammer"))) then
+                                return pl
+                            end
+                        end
+                    end
+                    UI.Section(page, "FERA")
+                    UI.Toggle(page, "ESP por role (Fera vermelha / sobreviventes verdes)", false, function(on)
+                        if on then
+                            ESP.ColorFn = function(pl)
+                                if findBeast() == pl then return Color3.fromRGB(255, 60, 60) end
+                                return Color3.fromRGB(90, 230, 120)
+                            end
+                            preset({esp_chams = true, esp_name = true})
+                        else
+                            ESP.ColorFn = nil
+                        end
+                    end)
+                    local warn, announce, lastB, lastWarn = false, false, nil, 0
+                    UI.Toggle(page, "Alerta: Fera a menos de 40 studs", false, function(on) warn = on end)
+                    UI.Toggle(page, "Avisar quem e a Fera", false, function(on) announce = on end)
+                    task.spawn(function()
+                        while alive do
+                            local b = findBeast()
+                            if announce and b and b ~= lastB then
+                                notify("Fera", b.DisplayName .. " (@" .. b.Name .. ")", 5, "err")
+                            end
+                            lastB = b
+                            local r = getRoot()
+                            local br = b and b.Character and b.Character:FindFirstChild("HumanoidRootPart")
+                            if warn and r and br and os.clock() - lastWarn > 2 and (br.Position - r.Position).Magnitude < 40 then
+                                lastWarn = os.clock()
+                                notify("PERIGO", "A Fera esta perto!", 2, "err")
+                            end
+                            task.wait(1)
+                        end
+                    end)
+                    UI.Button(page, "👁  Observar a Fera", function()
+                        local b = findBeast()
+                        local h = b and b.Character and b.Character:FindFirstChildOfClass("Humanoid")
+                        if h then workspace.CurrentCamera.CameraSubject = h else notify("Fera", "Fera nao encontrada.", 3, "err") end
+                    end)
+                    UI.Section(page, "SOBREVIVER")
+                    UI.Button(page, "🏃  Speed 24 + anti void", function()
+                        preset({speed = true, antivoid = true}, {speedv = 24})
+                    end)
+                    UI.Button(page, "🥷  Modo Fugitivo (speed 26 + infjump + anti fling)", function()
+                        preset({speed = true, infjump = true, antifling = true, antivoid = true}, {speedv = 26})
+                    end)
+                end,
+            })},
+        {Name = "Combat Warriors", Desc = "ESP, aimbot legit, alerta de inimigo, armas e movimentacao",
+            Ids = {4282985734}, Keys = {"combat warriors"},
+            Build = builder({
+                info = "Luta com armas brancas e distancia: ESP, alertas e presets. Anti-cheat ativo, prefira Legit.", infoH = 30,
+                shooter = true,
+                groups = {{"Armas no chao", {"sword", "pistol", "rifle", "shotgun", "bow", "axe"}}, {"Baus", {"chest", "crate"}}},
+                custom = function(page)
+                    UI.Section(page, "DUELO")
+                    UI.Button(page, "👁  ESP de jogadores + alerta (50 studs)", function()
+                        preset({esp_name = true, esp_health = true, esp_box = true, enemyalert = true}, {alertdist = 50})
+                    end)
+                    UI.Button(page, "⚡  Speed 28 + Infinite Jump", function()
+                        preset({speed = true, infjump = true}, {speedv = 28})
+                    end)
+                    UI.Button(page, "🛡  Anti fling + anti void", function()
+                        preset({antifling = true, antivoid = true})
                     end)
                 end,
             })},
