@@ -3157,6 +3157,307 @@ function X.nearbyBlock(page, sub)
     UI.Slider(page, "Distancia do alerta", 10, 300, State.AlertDist, function(v) State.AlertDist = v end, (not sub) and "alertdist" or nil)
 end
 
+
+--==================================================
+-- MUSICA (player por ID + tentativa na boombox)
+--==================================================
+X.Music = {Vol = 50, Speed = 100, Loop = false, Queue = nil, QIdx = 0, Cur = nil, Fav = {}, token = 0, fails = 0}
+X.MusicSound = new("Sound", {Name = "LostHubMusic", Volume = 2.5, Looped = false}, game:GetService("SoundService"))
+X.FavFile = "LostHub_music.json"
+
+pcall(function()
+    if isfile and readfile and isfile(X.FavFile) then
+        local d = HttpService:JSONDecode(readfile(X.FavFile))
+        if type(d) == "table" then X.Music.Fav = d end
+    end
+end)
+function X.saveFavs()
+    if writefile then
+        pcall(function() writefile(X.FavFile, HttpService:JSONEncode(X.Music.Fav)) end)
+    end
+end
+
+function X.musicSetLabel(text)
+    if X.Music.label then X.Music.label.Text = text end
+end
+
+function X.musicPlay(id, name)
+    local clean = tostring(id or ""):gsub("%D", "")
+    if #clean == 0 then
+        notify("Musica", "Digite um ID (so numeros).", 3, "err")
+        return
+    end
+    local snd = X.MusicSound
+    snd:Stop()
+    snd.SoundId = "rbxassetid://" .. clean
+    snd.Volume = X.Music.Vol / 20
+    snd.PlaybackSpeed = X.Music.Speed / 100
+    snd.Looped = X.Music.Loop and not X.Music.Queue
+    X.Music.Cur = {id = clean, name = name or clean}
+    X.Music.token = X.Music.token + 1
+    local token = X.Music.token
+    snd:Play()
+    X.musicSetLabel("Carregando: " .. (name or clean) .. " ...")
+    task.spawn(function()
+        local t0 = os.clock()
+        while token == X.Music.token and not snd.IsLoaded and os.clock() - t0 < 7 do
+            task.wait(0.1)
+        end
+        if token ~= X.Music.token then return end
+        if not snd.IsLoaded or snd.TimeLength <= 0 then
+            X.musicSetLabel("Falhou: " .. (name or clean))
+            notify("Musica", "Nao carregou (ID privado/removido): " .. (name or clean), 3, "err")
+            if X.Music.Queue then
+                X.Music.fails = X.Music.fails + 1
+                if X.Music.fails >= #X.Music.Queue then
+                    X.Music.Queue = nil
+                    X.Music.fails = 0
+                    notify("Playlist", "Nenhuma musica da lista carregou.", 4, "err")
+                else
+                    task.wait(0.3)
+                    X.musicNext()
+                end
+            end
+        else
+            X.Music.fails = 0
+            X.musicSetLabel("Tocando: " .. (name or clean))
+            notify("Tocando", name or clean, 3, "ok")
+        end
+    end)
+end
+
+function X.musicNext()
+    local q = X.Music.Queue
+    if not q or #q == 0 then
+        notify("Playlist", "Nenhuma playlist ativa.", 2, "err")
+        return
+    end
+    X.Music.QIdx = X.Music.QIdx % #q + 1
+    local s = q[X.Music.QIdx]
+    X.musicPlay(s[2], s[1])
+end
+
+function X.musicQueue(list, shuffle)
+    local q = {}
+    for _, s in ipairs(list) do table.insert(q, s) end
+    if shuffle then
+        for i = #q, 2, -1 do
+            local j = math.random(1, i)
+            q[i], q[j] = q[j], q[i]
+        end
+    end
+    X.Music.Queue, X.Music.QIdx, X.Music.fails = q, 0, 0
+    X.musicNext()
+end
+
+function X.musicStop()
+    X.Music.token = X.Music.token + 1
+    X.Music.Queue = nil
+    X.MusicSound:Stop()
+    X.musicSetLabel("Nada tocando.")
+end
+
+bind(X.MusicSound.Ended, function()
+    if X.Music.Queue then
+        X.musicNext()
+    end
+end)
+
+-- tentativa experimental de mandar o ID para a boombox do jogo
+function X.boomboxSend(id)
+    local clean = tostring(id or ""):gsub("%D", "")
+    if #clean == 0 then
+        notify("Boombox", "Digite um ID (so numeros).", 3, "err")
+        return
+    end
+    local bp = LocalPlayer:FindFirstChild("Backpack")
+    local tool
+    for _, holder in ipairs({getChar(), bp}) do
+        if holder then
+            for _, t in ipairs(holder:GetChildren()) do
+                if t:IsA("Tool") and t.Name:lower():find("boom") then
+                    tool = t
+                    break
+                end
+            end
+        end
+        if tool then break end
+    end
+    local remotes = {}
+    local function isRemote(d) return d:IsA("RemoteEvent") or d:IsA("RemoteFunction") end
+    if tool then
+        local h = getHum()
+        if h and tool.Parent == bp then pcall(function() h:EquipTool(tool) end) end
+        for _, d in ipairs(tool:GetDescendants()) do
+            if isRemote(d) then table.insert(remotes, d) end
+        end
+    end
+    for _, d in ipairs(ReplicatedStorage:GetDescendants()) do
+        if isRemote(d) then
+            local n = d.Name:lower()
+            if n:find("boom") or n:find("music") or n:find("song") or n:find("radio") then
+                table.insert(remotes, d)
+            end
+        end
+    end
+    if #remotes == 0 then
+        notify("Boombox", "Nenhuma boombox/remote de musica achada.", 4, "err")
+        return
+    end
+    local num = tonumber(clean)
+    local patterns = {{clean}, {num}, {"Play", clean}, {"PlaySong", clean}, {"rbxassetid://" .. clean}}
+    for _, r in ipairs(remotes) do
+        for _, args in ipairs(patterns) do
+            pcall(function()
+                if r:IsA("RemoteEvent") then
+                    r:FireServer(unpack(args))
+                else
+                    task.spawn(function() r:InvokeServer(unpack(args)) end)
+                end
+            end)
+            task.wait(0.05)
+        end
+    end
+    notify("Boombox", "Enviado para " .. #remotes .. " remote(s). Se ninguem ouvir, o jogo nao aceita ID customizado.", 5)
+end
+
+-- listas (IDs de sites publicos; alguns podem estar privados/removidos, a playlist pula sozinha)
+X.MusicLists = {
+    {"🔥 PHONK", {
+        {"Dark City Lights Phonk", "101101342670886"}, {"War Inside (Gym Phonk)", "78586039905107"},
+        {"Lost Phonk", "139266399633943"}, {"Phonk Assassin Mode", "93666258819111"},
+        {"GTR Phonk", "83624433031847"}, {"GTA VI Phonk", "112576678639596"},
+        {"Phonk Drift", "72653741821355"}, {"Rogue City Phonk", "111109407506851"},
+        {"Pure Phonk Violence", "96461852889782"}, {"Phonk Nightmare Race", "129127997655557"},
+        {"Move Through Fire (Dark Duet)", "118673350158682"}, {"Final Ride Phonk", "86802355429172"},
+        {"Mega Phonk", "134434412138800"}, {"Doggy Phonk", "123047130884626"},
+        {"PHONK.exe", "97192334657561"}, {"Above Phonk", "89824897586105"},
+        {"Jazz Metal Phonk", "135071730662747"}, {"Roblox Phonk", "136932193331774"},
+        {"She Stares Intently", "136716637489655"}, {"The Night Burns Me", "101098976710405"},
+        {"Dark Phonk Damage", "105529482486905"}, {"DTI Phonk", "139161205970637"},
+        {"Blackout Drift", "85290495098172"}, {"Bloody Phonk", "136350225160627"},
+        {"Burn the Night", "136579058345590"}, {"Cowbell God", "16190760005"},
+        {"Down2Kill", "16190760285"}, {"Black Seed", "14145622615"},
+        {"Bell Pepper", "14145626111"}, {"Dionic", "15689445424"},
+        {"Phonk't Out", "14145625743"}, {"The Final Phonk", "14145620056"},
+        {"Emotional Damage", "14145621151"},
+    }},
+    {"🇧🇷 PHONK BRASILEIRO", {
+        {"Noite do Capim", "96688874266744"}, {"Aggressive Brazilian Phonk", "102892380593258"},
+        {"Aura Saiyan Drop", "124170748342120"}, {"AURA = ∞", "76503495566299"},
+        {"Brazilian Phonk Fiesta", "129276852097746"}, {"Brazilian Phonk", "108621585736031"},
+        {"Montagem Panama", "110817176848617"}, {"Funk Azulejo", "81457346687617"},
+        {"Toma Funk Phonk", "129098116998483"}, {"Phonk Da Rua", "104596909675653"},
+        {"Batida Selvagem", "104603824839639"}, {"Spain vs Argentina", "139769280318833"},
+        {"Happy Birthday (BR Phonk)", "94935794334796"}, {"Brazil Fiesta", "125498129824026"},
+        {"Funk Fiesta", "139959590610806"}, {"Redline Brazilian Phonk", "133933510969921"},
+        {"COBRA SA DUGO", "91707473577838"},
+    }},
+    {"🎤 FUNK", {
+        {"Pavao Vandalo (Baile Drift)", "87624905430387"}, {"NIXHT FUNK", "87337128967086"},
+        {"GENESIS FUNK", "108224715633346"}, {"Famino Funk", "106317184644394"},
+        {"Funk Festa", "103409297553965"}, {"Brazilian F", "128275554636610"},
+        {"Funk da Favela", "1837196820"}, {"Ready to Funk", "1836681101"},
+        {"Tocatta Funk", "1840281557"}, {"Welcome Brazil", "1839555607"},
+        {"Getting Loco", "1837255830"}, {"Massa", "1842497736"},
+        {"F-360", "1841682637"}, {"Clap", "1845351312"},
+        {"Dropskit", "5280905113"}, {"Waka Waka", "5506713323"},
+    }},
+    {"🐌 SLOWED / DARK", {
+        {"OASIS PHONK (Slowed)", "127096476530496"}, {"Mano Mama Funk Phonk (Slowed)", "102827114027930"},
+        {"Funk Inferna V2 (Deep Slowed)", "86375151296706"}, {"Chill Phonk", "136974179670066"},
+        {"Toxic Smoke (Slowed 8D)", "139719375902695"}, {"Big Bad Wolf (Super Slowed)", "134108795864875"},
+        {"Phonk of Darkness", "116896498238234"},
+    }},
+    {"🎧 LOFI / CHILL", {
+        {"Lo-fi Chill A", "9043887091"}, {"Studying Alone Lofi", "74137426221090"},
+        {"Clair de Lune", "1846051682"}, {"Chill Jazz", "926493242"}, {"Island Beach", "1839638511"},
+    }},
+    {"😂 VIRAIS / MEMES", {
+        {"Old Town Road", "2862170886"}, {"Esketit", "1212786666"}, {"Banana Song", "169360242"},
+        {"Caillou Trap Remix", "212675193"}, {"Harlem Shake", "131154740"}, {"BTS - Fire", "591276362"},
+    }},
+}
+
+function X.musicBlock(page)
+    UI.Section(page, "MUSICA")
+    X.Music.label = UI.Label(page, "Nada tocando.", 16)
+    UI.Label(page, "A musica toca so para voce. O botao da boombox e experimental: o Brookhaven atual pode nao aceitar IDs customizados.", 40)
+    local box = UI.TextInput(page, "ID da musica (so numeros)...", "", nil)
+    UI.Button(page, "▶  Tocar ID", function()
+        X.Music.Queue = nil
+        X.musicPlay(box.Text)
+    end)
+    UI.Button(page, "📻  Tentar enviar para a boombox (experimental)", function()
+        X.boomboxSend(box.Text)
+    end)
+    UI.Button(page, "⏯  Pausar / Continuar", function()
+        local snd = X.MusicSound
+        if snd.IsPlaying then snd:Pause() else snd:Resume() end
+    end)
+    UI.Button(page, "⏭  Proxima da playlist", function() X.musicNext() end)
+    UI.Button(page, "⏹  Parar", function() X.musicStop() end)
+    UI.Slider(page, "Volume", 0, 100, X.Music.Vol, function(v)
+        X.Music.Vol = v
+        X.MusicSound.Volume = v / 20
+    end)
+    UI.Slider(page, "Velocidade % (menor = slowed)", 50, 150, X.Music.Speed, function(v)
+        X.Music.Speed = v
+        X.MusicSound.PlaybackSpeed = v / 100
+    end)
+    UI.Toggle(page, "Repetir musica", false, function(on)
+        X.Music.Loop = on
+        X.MusicSound.Looped = on and not X.Music.Queue
+    end)
+
+    UI.Section(page, "FAVORITOS")
+    UI.Button(page, "⭐  Salvar ID atual nos favoritos", function()
+        local id = (X.Music.Cur and X.Music.Cur.id) or tostring(box.Text):gsub("%D", "")
+        if id and #id > 0 and not table.find(X.Music.Fav, id) then
+            table.insert(X.Music.Fav, id)
+            X.saveFavs()
+            notify("Favoritos", "ID " .. id .. " salvo.", 2, "ok")
+        else
+            notify("Favoritos", "Nada para salvar (ou ja salvo).", 2, "err")
+        end
+    end)
+    UI.Dropdown(page, "Favoritos", function()
+        if #X.Music.Fav == 0 then return {"(vazio)"} end
+        return X.Music.Fav
+    end, function(opt)
+        if opt ~= "(vazio)" then
+            X.Music.Queue = nil
+            X.musicPlay(opt)
+        end
+    end)
+    UI.Button(page, "🗑  Limpar favoritos", function()
+        X.Music.Fav = {}
+        X.saveFavs()
+    end)
+
+    for _, list in ipairs(X.MusicLists) do
+        UI.Section(page, list[1] .. " (" .. #list[2] .. ")")
+        UI.Button(page, "🔀  Tocar tudo (aleatorio)", function()
+            X.musicQueue(list[2], true)
+        end)
+        UI.Button(page, "▶  Tocar tudo (em ordem)", function()
+            X.musicQueue(list[2], false)
+        end)
+        UI.Dropdown(page, "Escolher musica", function()
+            local names = {}
+            for _, s in ipairs(list[2]) do table.insert(names, s[1]) end
+            return names
+        end, function(name)
+            for _, s in ipairs(list[2]) do
+                if s[1] == name then
+                    X.Music.Queue = nil
+                    X.musicPlay(s[2], s[1])
+                    return
+                end
+            end
+        end)
+    end
+end
 --==================================================
 -- ABA: PRINCIPAL
 --==================================================
@@ -4612,10 +4913,11 @@ do
                     end)
                 end,
                 groups = {{"Dinheiro", {"cash", "money"}}, {"Airdrop", {"airdrop"}}, {"Joias", {"jewel", "diamond"}}, {"Cofres", {"safe", "vault"}}}})},
-        {Name = "Brookhaven RP", Desc = "Explorar, teleporte, brincadeiras e troll em players",
+        {Name = "Brookhaven RP", Desc = "Musica por ID (phonk, funk, lofi), explorar, teleporte e brincadeiras",
             Ids = {4924922222}, Keys = {"brookhaven"},
             Build = builder({info = "RP: modo explorar. A aba TROLL tem teleporte, observar, grudar e fling.", explore = true,
                 custom = function(page)
+                    X.musicBlock(page)
                     UI.Section(page, "BRINCADEIRAS")
                     UI.Button(page, "🌈  Modo Festa (spin + neon)", function()
                         preset({spin = true, neon = true})
@@ -5480,6 +5782,7 @@ unload = function()
     Obj.On = false
     TS.Stick = false
 
+    pcall(function() X.musicStop() X.MusicSound:Destroy() end)
     pcall(clearFly)
     pcall(restoreHitbox)
     pcall(clearObj)
