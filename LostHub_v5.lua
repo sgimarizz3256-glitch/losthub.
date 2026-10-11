@@ -5504,6 +5504,203 @@ do
     -- REGISTRO ------------------------------------------------------------
     local fruitWatch, entityWatch = false, false
 
+    local function soccerCustom(page)
+                    local ball, goals = nil, {}
+                    local cfg = {follow = false, kick = false, face = true, reach = 9, goalMode = "Mais longe de mim", lastKick = 0}
+
+                    local function isBall(d)
+                        if not d:IsA("BasePart") or d.Anchored then return false end
+                        local n = d.Name:lower()
+                        if not (n:find("ball", 1, true) or n:find("bola", 1, true)) then return false end
+                        local m = d.Size.Magnitude
+                        if m > 20 or m < 1 then return false end
+                        local model = d:FindFirstAncestorOfClass("Model")
+                        if model and Players:GetPlayerFromCharacter(model) then return false end
+                        return true
+                    end
+
+                    local function refresh()
+                        local b, gl, n = nil, {}, 0
+                        for _, d in ipairs(workspace:GetDescendants()) do
+                            n = n + 1
+                            if n % 5000 == 0 then task.wait() end
+                            if d:IsA("BasePart") then
+                                if not b and isBall(d) then b = d end
+                                local ln = d.Name:lower()
+                                if (ln:find("goal", 1, true) or ln:find("trave", 1, true)) and not ln:find("gold", 1, true) then
+                                    table.insert(gl, d)
+                                end
+                            end
+                        end
+                        ball, goals = b, gl
+                    end
+
+                    local function targetGoal()
+                        local r = getRoot()
+                        if not r or #goals == 0 then return end
+                        local best, bd
+                        for _, g in ipairs(goals) do
+                            if g.Parent then
+                                local d = (g.Position - r.Position).Magnitude
+                                local better = bd == nil or (cfg.goalMode == "Mais perto de mim" and d < bd)
+                                    or (cfg.goalMode ~= "Mais perto de mim" and d > bd)
+                                if better then best, bd = g, d end
+                            end
+                        end
+                        return best
+                    end
+
+                    task.spawn(function()
+                        local lastRefresh = 0
+                        while alive do
+                            if cfg.follow or cfg.kick then
+                                if not ball or not ball.Parent or os.clock() - lastRefresh > 4 then
+                                    lastRefresh = os.clock()
+                                    refresh()
+                                end
+                                local r, h = getRoot(), getHum()
+                                if ball and ball.Parent and r and h then
+                                    local dist = (ball.Position - r.Position).Magnitude
+                                    if cfg.follow and dist > 3 then
+                                        h:MoveTo(ball.Position)
+                                    end
+                                    if cfg.kick and dist <= cfg.reach and os.clock() - cfg.lastKick > 0.7 then
+                                        cfg.lastKick = os.clock()
+                                        if cfg.face then
+                                            local g = targetGoal()
+                                            if g then
+                                                r.CFrame = CFrame.lookAt(r.Position, Vector3.new(g.Position.X, r.Position.Y, g.Position.Z))
+                                            end
+                                        end
+                                        pcall(function()
+                                            if mouse1click then mouse1click() else VirtualUser:ClickButton1(Vector2.new()) end
+                                        end)
+                                    end
+                                end
+                            end
+                            task.wait(0.1)
+                        end
+                    end)
+
+                    UI.Section(page, "BOLA E GOL")
+                    UI.Button(page, "🔄  Atualizar bola e gols", function()
+                        refresh()
+                        notify("Futebol", (ball and "Bola achada" or "Bola NAO achada") .. " • " .. #goals .. " gol(s)", 3, ball and "ok" or "err")
+                    end)
+                    UI.Toggle(page, "Seguir a bola (corre ate ela)", false, function(v) cfg.follow = v end)
+                    UI.Toggle(page, "Auto chute (clica quando a bola esta perto)", false, function(v) cfg.kick = v end)
+                    UI.Slider(page, "Alcance do chute (studs)", 4, 25, cfg.reach, function(v) cfg.reach = v end)
+                    UI.Toggle(page, "Virar para o gol antes de chutar", true, function(v) cfg.face = v end)
+                    UI.Cycle(page, "Gol alvo", {"Mais longe de mim", "Mais perto de mim"}, cfg.goalMode, function(v) cfg.goalMode = v end)
+                    UI.Button(page, "⚽  Teleportar na bola", function()
+                        if not ball or not ball.Parent then refresh() end
+                        if ball then tpTo(ball.Position + Vector3.new(0, 2, 0)) else notify("Futebol", "Bola nao encontrada.", 3, "err") end
+                    end)
+                    UI.Button(page, "🥅  Teleportar no gol alvo", function()
+                        if #goals == 0 then refresh() end
+                        local g = targetGoal()
+                        if g then tpTo(g.Position + Vector3.new(0, 3, 0)) else notify("Futebol", "Gol nao encontrado.", 3, "err") end
+                    end)
+                    UI.Button(page, "👁  ESP da bola e dos gols", function()
+                        setKeywords({"ball", "bola", "goal", "trave"})
+                        preset({obj_esp = true})
+                    end)
+
+                    UI.Section(page, "JOGADOR")
+                    UI.Button(page, "🏃  Speed 28 + anti void", function()
+                        preset({speed = true, antivoid = true}, {speedv = 28})
+                    end)
+                    UI.Button(page, "🛡  Anti fling (muito util no futebol)", function()
+                        preset({antifling = true, antivoid = true})
+                    end)
+                    UI.Button(page, "👁  ESP de jogadores por time + nome", function()
+                        preset({esp_team = true, esp_name = true, esp_chams = true})
+                    end)
+                    UI.Button(page, "🚨  Alerta de adversario perto (40 studs)", function()
+                        preset({enemyalert = true}, {alertdist = 40})
+                    end)
+    end
+
+    local function animalCustom(page)
+        local cfg = {on = false, tp = false, word = ""}
+        local prompts, refreshedAt = {}, 0
+        local function refreshPrompts()
+            local list, n = {}, 0
+            for _, d in ipairs(workspace:GetDescendants()) do
+                n = n + 1
+                if n % 5000 == 0 then task.wait() end
+                if d:IsA("ProximityPrompt") then table.insert(list, d) end
+            end
+            prompts, refreshedAt = list, os.clock()
+        end
+        local function promptPos(p)
+            if p.Parent:IsA("BasePart") then return p.Parent.Position end
+            if p.Parent:IsA("Attachment") then return p.Parent.WorldPosition end
+        end
+        task.spawn(function()
+            while alive do
+                if cfg.on and fireproximityprompt then
+                    if os.clock() - refreshedAt > 3 then refreshPrompts() end
+                    local r = getRoot()
+                    if r then
+                        local best, bd, bpos
+                        for _, p in ipairs(prompts) do
+                            if p.Parent and p.Enabled then
+                                local txt = ((p.ActionText or "") .. " " .. (p.ObjectText or "")):lower()
+                                if cfg.word == "" or txt:find(cfg.word, 1, true) then
+                                    local pos = promptPos(p)
+                                    if pos then
+                                        local d = (pos - r.Position).Magnitude
+                                        if not bd or d < bd then best, bd, bpos = p, d, pos end
+                                    end
+                                end
+                            end
+                        end
+                        if best then
+                            if bd <= best.MaxActivationDistance then
+                                pcall(fireproximityprompt, best)
+                            elseif cfg.tp and bd < 400 then
+                                r.CFrame = CFrame.new(bpos + Vector3.new(0, 3, 0))
+                                task.wait(0.2)
+                                pcall(fireproximityprompt, best)
+                            end
+                        end
+                    end
+                    task.wait(0.5)
+                else
+                    task.wait(0.4)
+                end
+            end
+        end)
+
+        UI.Section(page, "ATENDIMENTO AUTOMATICO")
+        UI.Toggle(page, "Auto interagir (prompt mais proximo)", false, function(v)
+            cfg.on = v
+            if v and not fireproximityprompt then
+                notify("Aviso", "Seu executor nao suporta fireproximityprompt.", 4, "err")
+            end
+        end)
+        UI.Toggle(page, "Teleportar ate o prompt (agressivo)", false, function(v) cfg.tp = v end)
+        UI.TextInput(page, "Filtrar prompts por texto (ex: curar, atender)...", "", function(t) cfg.word = t:lower() end)
+        UI.Button(page, "🤏  Prompts instantaneos + automaticos", function()
+            preset({instaprompt = true, autoprompt = true})
+        end)
+        UI.Button(page, "💰  Coletar dinheiro / gorjetas automaticamente", function()
+            setKeywords({"cash", "money", "coin", "tip", "gorjeta"})
+            preset({autocollect = true, obj_esp = true})
+        end)
+        UI.Button(page, "🐾  Ir ate o animal / paciente mais proximo", function()
+            local p = nearestObj(function(d)
+                return nameHas(d, {"patient", "paciente", "animal", "pet", "dog", "cat", "puppy", "kitten", "bunny"})
+                    and not (d:FindFirstAncestorOfClass("Model") and Players:GetPlayerFromCharacter(d:FindFirstAncestorOfClass("Model")))
+            end)
+            if p then tpTo(p.Position) else notify("Hospital", "Nenhum animal encontrado.", 3, "err") end
+        end)
+        UI.Button(page, "🏃  Speed 28 + anti void + anti AFK", function()
+            preset({speed = true, antivoid = true, antiafk = true}, {speedv = 28})
+        end)
+    end
+
     Games = {
         {Name = "Prison Life", Desc = "Fuga, teleportes, armas, itens, times, ESP por time e aimbot",
             Ids = {155615604, 4669040}, Keys = {"prison life"}, Build = buildPrison},
@@ -6038,122 +6235,29 @@ do
                 info = "Futebol de rua: acha a bola e os gols pelo nome dos objetos. Se o jogo usar outros nomes, ajuste pelo SCANNER na aba MUNDO.", infoH = 40,
                 explore = true,
                 groups = {{"Bola", {"ball", "bola"}}, {"Gols", {"goal", "trave"}}},
-                custom = function(page)
-                    local ball, goals = nil, {}
-                    local cfg = {follow = false, kick = false, face = true, reach = 9, goalMode = "Mais longe de mim", lastKick = 0}
-
-                    local function isBall(d)
-                        if not d:IsA("BasePart") or d.Anchored then return false end
-                        local n = d.Name:lower()
-                        if not (n:find("ball", 1, true) or n:find("bola", 1, true)) then return false end
-                        local m = d.Size.Magnitude
-                        if m > 20 or m < 1 then return false end
-                        local model = d:FindFirstAncestorOfClass("Model")
-                        if model and Players:GetPlayerFromCharacter(model) then return false end
-                        return true
-                    end
-
-                    local function refresh()
-                        local b, gl, n = nil, {}, 0
-                        for _, d in ipairs(workspace:GetDescendants()) do
-                            n = n + 1
-                            if n % 5000 == 0 then task.wait() end
-                            if d:IsA("BasePart") then
-                                if not b and isBall(d) then b = d end
-                                local ln = d.Name:lower()
-                                if (ln:find("goal", 1, true) or ln:find("trave", 1, true)) and not ln:find("gold", 1, true) then
-                                    table.insert(gl, d)
-                                end
-                            end
-                        end
-                        ball, goals = b, gl
-                    end
-
-                    local function targetGoal()
-                        local r = getRoot()
-                        if not r or #goals == 0 then return end
-                        local best, bd
-                        for _, g in ipairs(goals) do
-                            if g.Parent then
-                                local d = (g.Position - r.Position).Magnitude
-                                local better = bd == nil or (cfg.goalMode == "Mais perto de mim" and d < bd)
-                                    or (cfg.goalMode ~= "Mais perto de mim" and d > bd)
-                                if better then best, bd = g, d end
-                            end
-                        end
-                        return best
-                    end
-
-                    task.spawn(function()
-                        local lastRefresh = 0
-                        while alive do
-                            if cfg.follow or cfg.kick then
-                                if not ball or not ball.Parent or os.clock() - lastRefresh > 4 then
-                                    lastRefresh = os.clock()
-                                    refresh()
-                                end
-                                local r, h = getRoot(), getHum()
-                                if ball and ball.Parent and r and h then
-                                    local dist = (ball.Position - r.Position).Magnitude
-                                    if cfg.follow and dist > 3 then
-                                        h:MoveTo(ball.Position)
-                                    end
-                                    if cfg.kick and dist <= cfg.reach and os.clock() - cfg.lastKick > 0.7 then
-                                        cfg.lastKick = os.clock()
-                                        if cfg.face then
-                                            local g = targetGoal()
-                                            if g then
-                                                r.CFrame = CFrame.lookAt(r.Position, Vector3.new(g.Position.X, r.Position.Y, g.Position.Z))
-                                            end
-                                        end
-                                        pcall(function()
-                                            if mouse1click then mouse1click() else VirtualUser:ClickButton1(Vector2.new()) end
-                                        end)
-                                    end
-                                end
-                            end
-                            task.wait(0.1)
-                        end
-                    end)
-
-                    UI.Section(page, "BOLA E GOL")
-                    UI.Button(page, "🔄  Atualizar bola e gols", function()
-                        refresh()
-                        notify("Futebol", (ball and "Bola achada" or "Bola NAO achada") .. " • " .. #goals .. " gol(s)", 3, ball and "ok" or "err")
-                    end)
-                    UI.Toggle(page, "Seguir a bola (corre ate ela)", false, function(v) cfg.follow = v end)
-                    UI.Toggle(page, "Auto chute (clica quando a bola esta perto)", false, function(v) cfg.kick = v end)
-                    UI.Slider(page, "Alcance do chute (studs)", 4, 25, cfg.reach, function(v) cfg.reach = v end)
-                    UI.Toggle(page, "Virar para o gol antes de chutar", true, function(v) cfg.face = v end)
-                    UI.Cycle(page, "Gol alvo", {"Mais longe de mim", "Mais perto de mim"}, cfg.goalMode, function(v) cfg.goalMode = v end)
-                    UI.Button(page, "⚽  Teleportar na bola", function()
-                        if not ball or not ball.Parent then refresh() end
-                        if ball then tpTo(ball.Position + Vector3.new(0, 2, 0)) else notify("Futebol", "Bola nao encontrada.", 3, "err") end
-                    end)
-                    UI.Button(page, "🥅  Teleportar no gol alvo", function()
-                        if #goals == 0 then refresh() end
-                        local g = targetGoal()
-                        if g then tpTo(g.Position + Vector3.new(0, 3, 0)) else notify("Futebol", "Gol nao encontrado.", 3, "err") end
-                    end)
-                    UI.Button(page, "👁  ESP da bola e dos gols", function()
-                        setKeywords({"ball", "bola", "goal", "trave"})
-                        preset({obj_esp = true})
-                    end)
-
-                    UI.Section(page, "JOGADOR")
-                    UI.Button(page, "🏃  Speed 28 + anti void", function()
-                        preset({speed = true, antivoid = true}, {speedv = 28})
-                    end)
-                    UI.Button(page, "🛡  Anti fling (muito util no futebol)", function()
-                        preset({antifling = true, antivoid = true})
-                    end)
-                    UI.Button(page, "👁  ESP de jogadores por time + nome", function()
-                        preset({esp_team = true, esp_name = true, esp_chams = true})
-                    end)
-                    UI.Button(page, "🚨  Alerta de adversario perto (40 studs)", function()
-                        preset({enemyalert = true}, {alertdist = 40})
-                    end)
-                end,
+                custom = soccerCustom,
+            })},
+        {Name = "Hospital de Animais", Desc = "Auto atender, ESP de animais e estacoes, dinheiro e AFK farm",
+            Ids = {}, Keys = {"hospital de animais", "animal hospital", "pet hospital", "veterinar", "vet clinic"},
+            Build = builder({
+                info = "Modulo generico para jogos de hospital/clinica de animais. Acha animais e estacoes pelo nome dos objetos; ajuste pelo SCANNER na aba MUNDO se algo nao aparecer.", infoH = 40,
+                farm = true,
+                groups = {
+                    {"Animais / Pacientes", {"patient", "paciente", "animal", "pet", "dog", "cat", "puppy", "kitten", "bunny"}},
+                    {"Dinheiro / Gorjetas", {"cash", "money", "coin", "tip", "gorjeta"}},
+                    {"Estacoes de tratamento", {"bed", "cama", "surgery", "cirurgia", "xray", "x-ray", "medicine", "remedio", "vaccine", "vacina", "bath", "banho", "feed", "comida"}},
+                    {"Recepcao / Caixa", {"register", "reception", "recepcao", "desk", "counter"}},
+                    {"Baus / Presentes", {"chest", "gift", "crate"}},
+                },
+                custom = animalCustom,
+            })},
+        {Name = "Futebol Proibido", Desc = "Bola, gols, seguir bola, auto chute, mira no gol, ESP e alertas",
+            Ids = {}, Keys = {"futebol proibido", "forbidden football", "forbidden soccer", "proibido"},
+            Build = builder({
+                info = "Mesmo kit do Futebol de Rua: acha a bola e os gols pelo nome dos objetos. Se o jogo usar outros nomes, ajuste pelo SCANNER na aba MUNDO.", infoH = 40,
+                explore = true,
+                groups = {{"Bola", {"ball", "bola"}}, {"Gols", {"goal", "trave"}}},
+                custom = soccerCustom,
             })},
         {Name = "Universal", Desc = "Funciona em qualquer jogo",
             Ids = {}, Keys = {},
