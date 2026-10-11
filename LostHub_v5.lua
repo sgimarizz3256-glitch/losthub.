@@ -1,4 +1,4 @@
---// LOST HUB v5.1 | ULTRA UPDATE | Gray & Black Edition
+--// LOST HUB HALLOWEEN EDITION | v5.1 | Orange & Purple
 --// Loading novo, tela de key nova (lembrar key, tentativas, bloqueio),
 --// mais opcoes em cada jogo, novos jogos (Booga Booga, Bee Swarm, Build A Boat),
 --// alerta de inimigo, anti void, auto rejoin, auto server hop e muito mais.
@@ -30,18 +30,18 @@ local guiParent = (gethui and gethui()) or CoreGui
 -- PALETA
 --========================
 local C = {
-    bg     = Color3.fromRGB(8, 8, 10),
-    panel  = Color3.fromRGB(15, 15, 17),
-    item   = Color3.fromRGB(22, 22, 25),
-    hover  = Color3.fromRGB(38, 38, 42),
-    off    = Color3.fromRGB(45, 45, 50),
-    line   = Color3.fromRGB(62, 62, 68),
-    accent = Color3.fromRGB(185, 185, 190),
-    white  = Color3.fromRGB(240, 240, 242),
-    text   = Color3.fromRGB(215, 215, 218),
-    sub    = Color3.fromRGB(125, 125, 132),
-    ok     = Color3.fromRGB(225, 225, 228),
-    bad    = Color3.fromRGB(205, 100, 100),
+    bg     = Color3.fromRGB(12, 5, 16),
+    panel  = Color3.fromRGB(22, 10, 28),
+    item   = Color3.fromRGB(34, 16, 40),
+    hover  = Color3.fromRGB(58, 28, 64),
+    off    = Color3.fromRGB(64, 38, 70),
+    line   = Color3.fromRGB(110, 56, 84),
+    accent = Color3.fromRGB(255, 122, 24),
+    white  = Color3.fromRGB(255, 238, 218),
+    text   = Color3.fromRGB(242, 214, 192),
+    sub    = Color3.fromRGB(168, 124, 136),
+    ok     = Color3.fromRGB(255, 176, 64),
+    bad    = Color3.fromRGB(226, 62, 62),
 }
 
 --========================
@@ -130,11 +130,41 @@ local function makeParticles(parent, n, color)
     return step, list
 end
 
+
+-- particulas de emoji (morcegos, fantasmas, abobora...)
+local function makeEmojiParticles(parent, n, list)
+    local items = {}
+    for i = 1, n do
+        local lab = new("TextLabel", {
+            Size = UDim2.fromOffset(26, 26),
+            Position = UDim2.fromScale(math.random(), math.random()),
+            BackgroundTransparency = 1,
+            Text = list[math.random(1, #list)],
+            TextSize = math.random(12, 22),
+            TextTransparency = 0.5 + math.random() * 0.3,
+            ZIndex = 0,
+        }, parent)
+        items[i] = {f = lab, x = lab.Position.X.Scale, y = lab.Position.Y.Scale,
+            v = 0.02 + math.random() * 0.05, ph = math.random() * 6}
+    end
+    return function(dt, t)
+        for _, p in ipairs(items) do
+            p.y = p.y - p.v * dt
+            if p.y < -0.05 then
+                p.y = 1.05
+                p.x = math.random()
+            end
+            p.f.Position = UDim2.fromScale(p.x + math.sin(t * 0.8 + p.ph) * 0.02, p.y)
+            p.f.Rotation = math.sin(t + p.ph) * 14
+        end
+    end
+end
+
 --========================
 -- LIMPAR GUIs ANTIGAS
 --========================
 pcall(function()
-    for _, name in ipairs({"LostHub", "LostHubKey", "LostHubFOV", "LostHubToast", "LostHubESP"}) do
+    for _, name in ipairs({"LostHub", "LostHubKey", "LostHubFOV", "LostHubToast", "LostHubESP", "LostHubFX"}) do
         local old = guiParent:FindFirstChild(name)
         if old then
             old:Destroy()
@@ -203,13 +233,13 @@ do
     new("UIGradient", {
         Rotation = 90,
         Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(3, 3, 4)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(20, 20, 24)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(2, 2, 3)),
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(6, 2, 10)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(38, 15, 42)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(4, 1, 8)),
         }),
     }, Intro)
 
-    local introParticles = makeParticles(Intro, 60, C.white)
+    local introParticles = makeEmojiParticles(Intro, 34, {"🦇", "👻", "🎃", "🕸", "🍬", "💀", "🕷"})
 
     -- linha de varredura vertical
     local Scan = new("Frame", {
@@ -309,19 +339,17 @@ do
         Orbs[i] = o
     end
 
-    -- caveira desenhada em UI (ossos, olhos brilhando, mandibula animada)
-    local function makeSkull(parent, cx, cy)
-        local bone = Color3.fromRGB(228, 226, 220)
-        local boneDark = Color3.fromRGB(165, 163, 158)
-        local ink = Color3.fromRGB(6, 6, 8)
+    -- abobora de Halloween desenhada em UI (jack-o'-lantern com brilho de vela)
+    local function makePumpkin(parent, cx, cy)
+        local ink = Color3.fromRGB(14, 6, 10)
+        local glowCol = Color3.fromRGB(255, 218, 96)
         local group = new("Frame", {
             AnchorPoint = Vector2.new(0.5, 0.5),
             Position = UDim2.new(0, cx, 0, cy),
-            Size = UDim2.fromOffset(150, 172),
+            Size = UDim2.fromOffset(150, 150),
             BackgroundTransparency = 1,
         }, parent)
         local scale = new("UIScale", {Scale = 1}, group)
-
         local function box(x, y, w, h, col, r, par)
             local f = new("Frame", {
                 Position = UDim2.fromOffset(x, y),
@@ -339,68 +367,73 @@ do
             }, f)
         end
 
-        -- macas do rosto e dentes de cima
-        local cheek = box(26, 82, 98, 56, boneDark, 24)
-        grad(cheek, bone, boneDark)
-        local upperGum = box(38, 120, 74, 16, ink, 5)
-        for i = 0, 5 do
-            box(40 + i * 11.8, 121, 9.6, 14, bone, 3)
+        local stem = box(64, 0, 20, 32, Color3.fromRGB(86, 120, 40), 6)
+        stem.Rotation = 12
+        grad(stem, Color3.fromRGB(130, 170, 64), Color3.fromRGB(58, 88, 28))
+        local vine = box(80, 8, 26, 5, Color3.fromRGB(76, 150, 56), 3)
+        vine.Rotation = -28
+
+        for _, l in ipairs({{4, 28, 64, 112}, {82, 28, 64, 112}, {26, 20, 98, 124}}) do
+            local f = box(l[1], l[2], l[3], l[4], Color3.fromRGB(255, 140, 30), math.floor(l[3] / 2))
+            grad(f, Color3.fromRGB(255, 176, 56), Color3.fromRGB(206, 84, 10))
+            stroke(f, Color3.fromRGB(122, 46, 6), 2, 0.2)
         end
 
-        -- cranio
-        local cranium = box(10, 0, 130, 114, bone, 58)
-        grad(cranium, Color3.fromRGB(240, 238, 232), Color3.fromRGB(176, 174, 168))
-        stroke(cranium, ink, 2, 0.1)
-        local crack1 = box(96, 4, 2, 34, ink, 1)
-        crack1.Rotation = 24
-        crack1.BackgroundTransparency = 0.25
-        local crack2 = box(101, 30, 2, 22, ink, 1)
-        crack2.Rotation = -32
-        crack2.BackgroundTransparency = 0.35
-
-        -- orbitas + brilho dos olhos
-        local pupils, halos = {}, {}
-        for i, x in ipairs({30, 80}) do
-            local socket = box(x, 54, 40, 46, ink, 21)
-            stroke(socket, Color3.fromRGB(70, 70, 74), 3, 0.2)
-            halos[i] = box(7, 14, 26, 26, C.white, 13, socket)
+        local eyes, halos = {}, {}
+        for i, x in ipairs({36, 84}) do
+            halos[i] = box(x - 2, 52, 34, 34, glowCol, 17)
             halos[i].BackgroundTransparency = 0.82
-            pupils[i] = box(14, 21, 12, 12, C.white, 6, socket)
+            eyes[i] = new("TextLabel", {
+                Position = UDim2.fromOffset(x, 50),
+                Size = UDim2.fromOffset(30, 36),
+                BackgroundTransparency = 1,
+                Text = "▲",
+                TextColor3 = glowCol,
+                TextSize = 36,
+                Font = Enum.Font.GothamBlack,
+                TextStrokeColor3 = ink,
+                TextStrokeTransparency = 0.3,
+            }, group)
+        end
+        local nose = new("TextLabel", {
+            Position = UDim2.fromOffset(65, 82),
+            Size = UDim2.fromOffset(20, 16),
+            BackgroundTransparency = 1,
+            Text = "▼",
+            TextColor3 = ink,
+            TextSize = 14,
+            Font = Enum.Font.GothamBlack,
+        }, group)
+
+        local mouth = box(38, 100, 74, 30, glowCol, 12)
+        mouth.BackgroundTransparency = 0.12
+        stroke(mouth, ink, 2, 0.2)
+        for i = 0, 3 do
+            local t1 = box(46 + i * 16, 96, 10, 10, Color3.fromRGB(240, 120, 20), 2)
+            t1.Rotation = 45
+            local t2 = box(54 + i * 16, 124, 10, 10, Color3.fromRGB(240, 120, 20), 2)
+            t2.Rotation = 45
         end
 
-        -- nariz
-        local nose = box(69, 99, 12, 12, ink, 2)
-        nose.Rotation = 45
-
-        -- mandibula
-        local jaw = box(36, 134, 78, 34, boneDark, 15)
-        grad(jaw, bone, Color3.fromRGB(120, 118, 114))
-        stroke(jaw, ink, 2, 0.1)
-        box(7, 0, 64, 14, ink, 4, jaw)
-        for i = 0, 4 do
-            box(9 + i * 12.6, 2, 10, 11, bone, 3, jaw)
-        end
-
-        return {group = group, scale = scale, jaw = jaw, pupils = pupils, halos = halos, glitch = 0, cx = cx, cy = cy}
+        return {group = group, scale = scale, eyes = eyes, halos = halos, mouth = mouth, glitch = 0, cx = cx, cy = cy}
     end
 
-    local function animateSkull(sk, now)
-        local open = (math.sin(now * 2.4) + 1) / 2
-        sk.jaw.Position = UDim2.fromOffset(36, 134 + open * 6)
-        local glow = (math.sin(now * 3) + 1) / 2
+    local function animatePumpkin(pk, now)
+        local flick = 0.06 + (math.sin(now * 9) * 0.5 + 0.5) * 0.14 + (math.random() < 0.05 and 0.3 or 0)
+        pk.mouth.BackgroundTransparency = flick
         for i = 1, 2 do
-            sk.pupils[i].BackgroundTransparency = 0.05 + glow * 0.4
-            sk.halos[i].BackgroundTransparency = 0.9 - glow * 0.25
+            pk.eyes[i].TextTransparency = flick * 0.7
+            pk.halos[i].BackgroundTransparency = 0.9 - flick * 0.6
         end
         if math.random() < 0.012 then
-            sk.glitch = now + 0.09
+            pk.glitch = now + 0.09
         end
-        local jx = now < sk.glitch and math.random(-5, 5) or 0
-        sk.group.Position = UDim2.new(0, sk.cx + jx, 0, sk.cy + math.sin(now * 2) * 4)
-        sk.group.Rotation = math.sin(now * 1.6) * 5 + (jx ~= 0 and math.random(-4, 4) or 0)
+        local jx = now < pk.glitch and math.random(-5, 5) or 0
+        pk.group.Position = UDim2.new(0, pk.cx + jx, 0, pk.cy + math.sin(now * 2) * 4)
+        pk.group.Rotation = math.sin(now * 1.6) * 5 + (jx ~= 0 and math.random(-4, 4) or 0)
     end
 
-    local Skull = makeSkull(Stage, 0, LOGO_Y)
+    local Skull = makePumpkin(Stage, 0, LOGO_Y)
 
     -- titulo letra por letra
     local TITLE = "LOST HUB"
@@ -426,7 +459,7 @@ do
         Position = UDim2.new(0, 0, 0, 148),
         Size = UDim2.fromOffset(190, 16),
         BackgroundTransparency = 1,
-        Text = "V5.1  •  ULTRA UPDATE",
+        Text = "HALLOWEEN EDITION  •  V5.1",
         TextColor3 = C.sub,
         TextSize = 11,
         Font = Enum.Font.GothamBold,
@@ -491,11 +524,11 @@ do
     -- checklist das etapas
     local INTRO_TIME = 5.2
     local IntroSteps = {
-        {0.0, "Inicializando nucleo"},
-        {1.0, "Carregando interface"},
-        {2.0, "Preparando modulos"},
-        {3.0, "Sincronizando jogos"},
-        {4.0, "Finalizando"},
+        {0.0, "Invocando os espiritos"},
+        {1.0, "Acendendo as aboboras"},
+        {2.0, "Despertando os morcegos"},
+        {3.0, "Enchendo o saco de doces"},
+        {4.0, "Abrindo o portal"},
     }
     local stepLabels = {}
     for i, s in ipairs(IntroSteps) do
@@ -524,12 +557,35 @@ do
     }, Stage)
     local TIPS = {
         "Dica: RightShift esconde e mostra o menu.",
-        "Dica: Ctrl + clique teleporta (ligue em PRINCIPAL).",
-        "Dica: a aba TROLL tem observar, grudar e orbitar.",
-        "Dica: salve sua configuracao na aba CONFIG.",
-        "Dica: o jogo atual aparece como DETECTADO em SCRIPTS.",
-        "Dica: use o ALERTA DE INIMIGO em jogos de tiro.",
+        "Dica: ligue a Noite Assombrada na aba HALLOWEEN.",
+        "Dica: a aba HALLOWEEN tem musicas de terror e chuva de emojis.",
+        "Dica: ESP de aboboras e doces para eventos de Halloween.",
+        "Dica: use o Modo Vassoura para voar pelo mapa.",
+        "Dica: cuidado... nem todo fantasma e amigavel.",
     }
+
+    -- morcegos voando pela tela
+    local bats = {}
+    for i = 1, 7 do
+        bats[i] = {
+            l = new("TextLabel", {
+                Size = UDim2.fromOffset(34, 34),
+                BackgroundTransparency = 1,
+                Text = "🦇",
+                TextSize = 22 + (i % 3) * 6,
+                ZIndex = 3,
+            }, Intro),
+            sp = 0.05 + math.random() * 0.06, ph = math.random() * 10,
+            y = 0.08 + math.random() * 0.75, dir = (i % 2 == 0) and 1 or -1,
+        }
+    end
+    local function animateBats(now)
+        for _, b in ipairs(bats) do
+            local x = ((now * b.sp * b.dir + b.ph) % 1.3) - 0.15
+            b.l.Position = UDim2.new(x, 0, b.y + math.sin(now * 3 + b.ph) * 0.03, 0)
+            b.l.Rotation = math.sin(now * 6 + b.ph) * 12
+        end
+    end
 
     task.spawn(function()
         local start = os.clock()
@@ -541,12 +597,13 @@ do
             local pulse = math.sin(now * 3)
 
             introParticles(dt, now)
+            animateBats(now)
             Scan.Position = UDim2.new(0, 0, (now * 0.22) % 1, 0)
             Ring1.Rotation = Ring1.Rotation + 2.8
             Ring2.Rotation = Ring2.Rotation - 1.7
             Ring3.Rotation = Ring3.Rotation + 1.0
             Ring4.Rotation = Ring4.Rotation - 0.6
-            animateSkull(Skull, now)
+            animatePumpkin(Skull, now)
             CircleStroke.Transparency = 0.2 + math.abs(pulse) * 0.3
 
             for i, o in ipairs(Orbs) do
@@ -561,7 +618,7 @@ do
                 d.l.TextTransparency = 1 - a
                 d.l.Position = UDim2.new(0, d.x, 0, 116 + (1 - a) * 18)
                 local g = 0.72 + 0.28 * math.sin(now * 4 - i * 0.6)
-                d.l.TextColor3 = Color3.new(g, g, g + 0.01)
+                d.l.TextColor3 = Color3.new(1, 0.42 + 0.38 * g, 0.08 + 0.1 * g)
             end
             VerTag.TextTransparency = 1 - math.clamp((elapsed - 1.2) / 0.5, 0, 1)
 
@@ -648,8 +705,8 @@ do
     new("UIGradient", {
         Rotation = 90,
         Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 24)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 10, 12)),
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(38, 15, 42)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 6, 20)),
         }),
     }, KeyFrame)
     local KeyStroke = stroke(KeyFrame, C.accent, 1.6, 0.25)
@@ -661,7 +718,7 @@ do
         }),
     }, KeyStroke)
 
-    local keyParticles = makeParticles(KeyFrame, 22, C.white)
+    local keyParticles = makeEmojiParticles(KeyFrame, 12, {"🦇", "👻", "🎃", "🕸", "🍬"})
 
     local keyBase = vpScale(560)
     local KeyScale = new("UIScale", {Scale = keyBase * 0.6}, KeyFrame)
@@ -672,7 +729,7 @@ do
         Position = UDim2.new(0, 20, 0, 18),
         Size = UDim2.new(0, 48, 0, 48),
         BackgroundColor3 = C.item,
-        Text = "☠",
+        Text = "🎃",
         TextSize = 28,
         Font = Enum.Font.GothamBlack,
         TextColor3 = C.white,
@@ -701,9 +758,9 @@ do
 
     local KeyTag = new("TextLabel", {
         Position = UDim2.new(0, 214, 0, 22),
-        Size = UDim2.new(0, 30, 0, 18),
+        Size = UDim2.new(0, 34, 0, 18),
         BackgroundColor3 = C.item,
-        Text = "v5",
+        Text = "HW",
         TextColor3 = C.accent,
         TextSize = 10,
         Font = Enum.Font.GothamBold,
@@ -715,7 +772,7 @@ do
         Position = UDim2.new(0, 82, 0, 49),
         Size = UDim2.new(1, -100, 0, 18),
         BackgroundTransparency = 1,
-        Text = "Autenticacao necessaria para continuar",
+        Text = "Diga a senha para atravessar o portal...",
         TextColor3 = C.sub,
         TextSize = 11,
         Font = Enum.Font.Gotham,
@@ -820,7 +877,7 @@ do
         Size = UDim2.new(1, -40, 0, 44),
         BackgroundColor3 = C.hover,
         BorderSizePixel = 0,
-        Text = "VERIFICAR KEY",
+        Text = "ABRIR O PORTAL",
         TextColor3 = C.white,
         TextSize = 12,
         Font = Enum.Font.GothamBold,
@@ -856,7 +913,7 @@ do
         Position = UDim2.new(0, 20, 0, 278),
         Size = UDim2.new(1, -40, 0, 20),
         BackgroundTransparency = 1,
-        Text = "Aguardando key...",
+        Text = "O portal aguarda sua key...",
         TextColor3 = C.sub,
         TextSize = 11,
         Font = Enum.Font.GothamMedium,
@@ -866,7 +923,7 @@ do
         Position = UDim2.new(0, 20, 0, 312),
         Size = UDim2.new(1, -40, 0, 16),
         BackgroundTransparency = 1,
-        Text = "Lost Hub v5  •  RightShift esconde o menu",
+        Text = "Lost Hub Halloween Edition  •  RightShift esconde o menu",
         TextColor3 = C.off,
         TextSize = 9,
         Font = Enum.Font.Gotham,
@@ -930,7 +987,7 @@ do
             if not keyOk then
                 tries = 0
                 Tries.Text = "Tentativas 0/" .. MAX_TRIES
-                Enter.Text = "VERIFICAR KEY"
+                Enter.Text = "ABRIR O PORTAL"
                 ProgFill.Size = UDim2.new(0, 0, 1, 0)
                 ProgFill.BackgroundColor3 = C.white
                 setStatus("Pode tentar novamente.", C.sub)
@@ -952,15 +1009,15 @@ do
         end
 
         setStatus("Verificando...", C.text)
-        Enter.Text = "VERIFICANDO..."
+        Enter.Text = "INVOCANDO..."
         ProgFill.BackgroundColor3 = C.white
         tween(ProgFill, 0.55, {Size = UDim2.new(1, 0, 1, 0)}, Enum.EasingStyle.Quad)
         task.wait(0.6)
 
         if KEYS[txt] then
             keyOk = true
-            setStatus("✓ Key valida! Abrindo Lost Hub...", C.ok)
-            Enter.Text = "✓  ACESSO LIBERADO"
+            setStatus("✓ O portal se abriu... boo!", C.ok)
+            Enter.Text = "🎃  PORTAL ABERTO"
             tween(Enter, 0.25, {BackgroundColor3 = C.white, TextColor3 = C.bg})
             tween(KeyStroke, 0.25, {Thickness = 4})
             tween(KeyIcon, 0.3, {BackgroundColor3 = C.white, TextColor3 = C.bg})
@@ -977,8 +1034,8 @@ do
         else
             tries = tries + 1
             Tries.Text = "Tentativas " .. tries .. "/" .. MAX_TRIES
-            setStatus("✕ Key incorreta!", C.bad)
-            Enter.Text = "VERIFICAR KEY"
+            setStatus("✕ Os espiritos recusaram essa key!", C.bad)
+            Enter.Text = "ABRIR O PORTAL"
             ProgFill.Size = UDim2.new(0, 0, 1, 0)
             tween(InputStroke, 0.15, {Color = C.bad})
             shake()
@@ -1207,8 +1264,8 @@ corner(Main, 14)
 new("UIGradient", {
     Rotation = 90,
     Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(16, 16, 19)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(7, 7, 9)),
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(32, 13, 36)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(11, 4, 15)),
     }),
 }, Main)
 
@@ -1241,7 +1298,7 @@ local Title = new("TextLabel", {
     Position = UDim2.new(0, 20, 0, 10),
     Size = UDim2.new(0, 220, 0, 24),
     BackgroundTransparency = 1,
-    Text = "☠  LOST HUB",
+    Text = "🎃  LOST HUB",
     TextColor3 = C.white,
     TextSize = 19,
     Font = Enum.Font.GothamBlack,
@@ -1254,7 +1311,7 @@ local VersionTag = new("TextLabel", {
     Position = UDim2.new(0, 168, 0, 13),
     Size = UDim2.new(0, 34, 0, 16),
     BackgroundColor3 = C.item,
-    Text = "v5",
+    Text = "HW",
     TextColor3 = C.accent,
     TextSize = 10,
     Font = Enum.Font.GothamBold,
@@ -1267,7 +1324,7 @@ local GameLabel = new("TextLabel", {
     Position = UDim2.new(0, 22, 0, 33),
     Size = UDim2.new(0, 330, 0, 14),
     BackgroundTransparency = 1,
-    Text = "v5 • ultra update",
+    Text = "halloween edition • 🎃🦇👻",
     TextColor3 = C.sub,
     TextSize = 10,
     Font = Enum.Font.Gotham,
@@ -1530,10 +1587,10 @@ local function showPage(name, tabName)
 end
 
 local function createTab(text, pageName, order)
-    local y = 8 + (order - 1) * 40
+    local y = 8 + (order - 1) * 36
     local Button = new("TextButton", {
         Position = UDim2.new(0, -140, 0, y),
-        Size = UDim2.new(1, -16, 0, 34),
+        Size = UDim2.new(1, -16, 0, 31),
         BackgroundColor3 = C.panel,
         Text = text,
         TextColor3 = C.sub,
@@ -1543,6 +1600,9 @@ local function createTab(text, pageName, order)
         AutoButtonColor = false,
     }, Sidebar)
     corner(Button, 8)
+    Button.TextScaled = true
+    new("UITextSizeConstraint", {MaxTextSize = 11, MinTextSize = 7}, Button)
+    new("UIPadding", {PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6)}, Button)
     TabButtons[pageName] = {button = Button, y = y}
 
     task.delay(0.15 + order * 0.07, function()
@@ -1564,6 +1624,7 @@ local function createTab(text, pageName, order)
 end
 
 local Principal = createPage("Principal")
+local Halloween = createPage("Halloween")
 local Visual = createPage("Visual")
 local Combate = createPage("Combate")
 local Troll = createPage("Troll")
@@ -1572,14 +1633,15 @@ local Otimizacao = createPage("Otimizacao")
 local Scripts = createPage("Scripts")
 local Config = createPage("Config")
 
-createTab("🏠  PRINCIPAL", "Principal", 1)
-createTab("👁  VISUAL", "Visual", 2)
-createTab("🎯  COMBATE", "Combate", 3)
-createTab("😈  TROLL", "Troll", 4)
-createTab("🌍  MUNDO", "Mundo", 5)
-createTab("⚡  OTIMIZACAO", "Otimizacao", 6)
-createTab("📜  SCRIPTS", "Scripts", 7)
-createTab("⚙  CONFIG", "Config", 8)
+createTab("🎃  PRINCIPAL", "Principal", 1)
+createTab("🦇  HALLOWEEN", "Halloween", 2)
+createTab("👁  VISUAL", "Visual", 3)
+createTab("🔪  COMBATE", "Combate", 4)
+createTab("👻  TROLL", "Troll", 5)
+createTab("🕸  MUNDO", "Mundo", 6)
+createTab("⚡  OTIMIZAÇÃO", "Otimizacao", 7)
+createTab("📜  SCRIPTS", "Scripts", 8)
+createTab("⚙  CONFIG", "Config", 9)
 
 --==================================================
 -- COMPONENTES
@@ -3180,7 +3242,9 @@ function X.saveFavs()
 end
 
 function X.musicSetLabel(text)
-    if X.Music.label then X.Music.label.Text = text end
+    for _, l in ipairs(X.Music.labels or {}) do
+        if l.Parent then l.Text = text end
+    end
 end
 
 function X.musicPlay(id, name)
@@ -3325,6 +3389,25 @@ end
 
 -- listas (IDs de sites publicos; alguns podem estar privados/removidos, a playlist pula sozinha)
 X.MusicLists = {
+    {"🎃 HALLOWEEN", {
+        {"Spooky Scary Skeletons", "138081566"}, {"Spooky Scary Skeletons (alt)", "515669032"},
+        {"Spooky Scary Skeletons (versao 3)", "142376088"}, {"Spooky Scary Skeletons (versao 4)", "100828050594137"},
+        {"This Is Halloween", "349626331"}, {"This Is Halloween (alt)", "517273860"},
+        {"Halloween Theme (Michael Myers)", "380808812"}, {"Halloween Kills Theme", "7757344022"},
+        {"Creepy Music Box", "143382469"}, {"Scary Music Box", "209322206"},
+        {"Spooky Month Theme", "6003667593"}, {"Spooky Seasonal Track", "11058768310"},
+        {"Nightmare Music", "6991661856"}, {"Night OwL", "1843391637"}, {"Left for Dead", "1835370806"},
+    }},
+    {"🦇 AMBIENTE ASSOMBRADO", {
+        {"Scary Forest", "139393062477955"}, {"Liminal Space Creepy Music", "134959834418523"},
+        {"Scales of Horror Wind Up", "134348091099832"}, {"Cemetery of Masked Men", "95963342988177"},
+        {"Horror Sweetheart", "133459153618562"}, {"Midnight Litany of Drones", "140704980462451"},
+        {"Wailing Winds", "138056737764176"}, {"Forgotten Crypt", "139743346356072"},
+        {"Chilling Fog", "140033496825661"}, {"Haunted Castle Melody", "138917352150837"},
+        {"Simple Creepy Atmosphere", "139765110669684"}, {"Insane Patients", "1835337424"},
+        {"Fear Enhancer", "1835337231"}, {"Clockwork Murder", "1835370059"},
+        {"Sleep Paralysis", "1842447761"}, {"Eerie Memories", "1835261249"}, {"Demon Dimension", "1835356065"},
+    }},
     {"🔥 PHONK", {
         {"Dark City Lights Phonk", "101101342670886"}, {"War Inside (Gym Phonk)", "78586039905107"},
         {"Lost Phonk", "139266399633943"}, {"Phonk Assassin Mode", "93666258819111"},
@@ -3383,7 +3466,8 @@ X.MusicLists = {
 
 function X.musicBlock(page)
     UI.Section(page, "MUSICA")
-    X.Music.label = UI.Label(page, "Nada tocando.", 16)
+    X.Music.labels = X.Music.labels or {}
+    table.insert(X.Music.labels, UI.Label(page, "Nada tocando.", 16))
     UI.Label(page, "A musica toca so para voce. O botao da boombox e experimental: o Brookhaven atual pode nao aceitar IDs customizados.", 40)
     local box = UI.TextInput(page, "ID da musica (so numeros)...", "", nil)
     UI.Button(page, "▶  Tocar ID", function()
@@ -3555,6 +3639,7 @@ do
         end)
     end, "zoom")
     UI.Toggle(Visual, "Mira customizada", false, function(on) State.Crosshair = on end, "crosshair")
+    UI.Toggle(Visual, "Zoom segurando a tecla C", false, function(on) X.zoomC = on end, "zoomc")
 
     UI.Section(Visual, "ILUMINACAO / MUNDO")
     UI.Toggle(Visual, "Fullbright", false, function(on)
@@ -3672,7 +3757,7 @@ do
         Position = UDim2.new(0, 16, 0, 0),
         Size = UDim2.new(1, -60, 1, 0),
         BackgroundTransparency = 1,
-        Text = "☠  LOST INFOS",
+        Text = "🎃  LOST INFOS",
         TextColor3 = C.white,
         TextSize = 15,
         Font = Enum.Font.GothamBlack,
@@ -4029,6 +4114,23 @@ do
     UI.Button(Mundo, "📍  Teleportar para X, Y, Z", function()
         smoothTeleport(Vector3.new(cx, cy, cz))
     end)
+    local tpName = ""
+    UI.TextInput(Mundo, "Nome do jogador (ou parte do nome)...", "", function(txt) tpName = txt end)
+    UI.Button(Mundo, "👤  Teleportar para o jogador digitado", function()
+        local q = tpName:lower()
+        if #q == 0 then notify("Teleporte", "Digite um nome primeiro.", 3, "err") return end
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and (p.Name:lower():find(q, 1, true) or p.DisplayName:lower():find(q, 1, true)) then
+                local r = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+                if r then
+                    tpTo(r.Position)
+                    notify("Teleporte", "Voce foi ate " .. p.DisplayName .. ".", 3, "ok")
+                    return
+                end
+            end
+        end
+        notify("Teleporte", "Jogador nao encontrado.", 3, "err")
+    end)
     UI.Button(Mundo, "📋  Copiar minha posicao", function()
         local r = getRoot()
         if not r then return end
@@ -4119,7 +4221,7 @@ do
 end
 
 --==================================================
--- ABA: OTIMIZACAO (mais FPS)
+-- ABA: OTIMIZAÇÃO (mais FPS)
 --==================================================
 X.Opt = {On = {}, Saved = {}, G = {}, FogV = 600, count = 0}
 
@@ -4379,20 +4481,20 @@ do
     UI.Section(P, "PRESETS")
     UI.Button(P, "🍃  Boost leve (sombras, efeitos, pos-processamento)", function()
         preset(on({"shadows", "effects", "post", "lighting"}))
-        notify("Otimizacao", "Boost leve ligado.", 3, "ok")
+        notify("Otimização", "Boost leve ligado.", 3, "ok")
     end)
     UI.Button(P, "⚡  Boost medio (+ luzes, materiais, terreno, qualidade)", function()
         preset(on({"shadows", "effects", "post", "lighting", "lights", "materials", "terrain", "quality"}))
-        notify("Otimizacao", "Boost medio ligado.", 3, "ok")
+        notify("Otimização", "Boost medio ligado.", 3, "ok")
     end)
     UI.Button(P, "💀  Boost extremo (+ texturas e malhas simples)", function()
         preset(on({"shadows", "effects", "post", "lighting", "lights", "materials", "terrain", "quality", "textures", "meshes"}))
-        notify("Otimizacao", "Boost extremo ligado. O visual fica bem simples.", 4, "ok")
+        notify("Otimização", "Boost extremo ligado. O visual fica bem simples.", 4, "ok")
     end)
     UI.Button(P, "↩  Restaurar tudo", function()
         preset(allOff())
         X.optRestoreAll()
-        notify("Otimizacao", "Tudo restaurado.", 3, "ok")
+        notify("Otimização", "Tudo restaurado.", 3, "ok")
     end)
 
     UI.Section(P, "GRAFICOS")
@@ -4433,7 +4535,7 @@ do
                 end
             end
         end
-        notify("Otimizacao", n .. " itens removidos.", 3, "ok")
+        notify("Otimização", n .. " itens removidos.", 3, "ok")
     end)
     UI.Toggle(P, "Mutar sons do mapa", false, function(v) X.optToggle("mute", v) end, "opt_mute")
 
@@ -4456,6 +4558,322 @@ do
         ParticleLayer.Visible = not v
         State.TitleGlitch = not v
     end, "opt_menu")
+end
+
+--==================================================
+-- ABA: HALLOWEEN
+--==================================================
+X.HW = {atmos = false, rain = false, lightning = false, body = false, ghost = false,
+    saved = nil, bodySaved = {}, nextFlash = 0, ghostApplied = false}
+
+X.HWGui = new("ScreenGui", {
+    Name = "LostHubFX",
+    ResetOnSpawn = false,
+    IgnoreGuiInset = true,
+    DisplayOrder = 5,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+}, guiParent)
+
+X.HWFlash = new("Frame", {
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    ZIndex = 50,
+}, X.HWGui)
+
+-- chuva de emojis
+X.HWRain = {}
+do
+    local list = {"🎃", "🦇", "👻", "🍬", "🕷", "🕸", "💀"}
+    for i = 1, 26 do
+        local l = new("TextLabel", {
+            Size = UDim2.fromOffset(30, 30),
+            BackgroundTransparency = 1,
+            Text = list[math.random(1, #list)],
+            TextSize = math.random(16, 28),
+            TextTransparency = 0.1,
+            Visible = false,
+            ZIndex = 10,
+        }, X.HWGui)
+        X.HWRain[i] = {l = l, x = math.random(), y = math.random(), v = 0.08 + math.random() * 0.12, ph = math.random() * 6}
+    end
+end
+
+function X.hwAtmos(on)
+    local hw = X.HW
+    if on == hw.atmos then return end
+    hw.atmos = on
+    if on then
+        hw.saved = {
+            Ambient = Lighting.Ambient, OutdoorAmbient = Lighting.OutdoorAmbient, ClockTime = Lighting.ClockTime,
+            FogColor = Lighting.FogColor, FogEnd = Lighting.FogEnd, FogStart = Lighting.FogStart,
+            Brightness = Lighting.Brightness,
+        }
+        hw.cc = new("ColorCorrectionEffect", {Name = "LostHubHW", TintColor = Color3.fromRGB(255, 190, 150), Saturation = 0.15, Contrast = 0.08}, Lighting)
+        hw.bloom = new("BloomEffect", {Name = "LostHubHWBloom", Intensity = 0.4, Size = 24, Threshold = 0.9}, Lighting)
+    else
+        if hw.saved then
+            for k, v in pairs(hw.saved) do
+                pcall(function() Lighting[k] = v end)
+            end
+        end
+        pcall(function() hw.cc:Destroy() end)
+        pcall(function() hw.bloom:Destroy() end)
+    end
+end
+
+X.HWAuras = {
+    bats = {emoji = "🦇", n = 5, speed = 2.2, items = {}, on = false},
+    ghosts = {emoji = "👻", n = 4, speed = 1.4, items = {}, on = false},
+    pumpkins = {emoji = "🎃", n = 4, speed = 1.8, items = {}, on = false},
+}
+function X.hwAura(kind, on)
+    local a = X.HWAuras[kind]
+    a.on = on
+    if not on then
+        for _, b in ipairs(a.items) do pcall(function() b:Destroy() end) end
+        a.items = {}
+    end
+end
+
+function X.hwBodyRestore()
+    for p, d in pairs(X.HW.bodySaved) do
+        pcall(function()
+            p.Color, p.Material = d[1], d[2]
+        end)
+        X.HW.bodySaved[p] = nil
+    end
+end
+
+function X.hwOff()
+    local hw = X.HW
+    hw.rain, hw.lightning, hw.body, hw.ghost = false, false, false, false
+    X.hwAtmos(false)
+    X.hwBodyRestore()
+    for kind in pairs(X.HWAuras) do X.hwAura(kind, false) end
+    local c = getChar()
+    if c then
+        for _, p in ipairs(c:GetDescendants()) do
+            if p:IsA("BasePart") then pcall(function() p.LocalTransparencyModifier = 0 end) end
+        end
+    end
+end
+
+table.insert(Ticks, function(dt, t)
+    local hw = X.HW
+
+    for _, it in ipairs(X.HWRain) do
+        if hw.rain then
+            it.l.Visible = true
+            it.y = it.y + it.v * dt
+            if it.y > 1.05 then
+                it.y = -0.05
+                it.x = math.random()
+            end
+            it.l.Position = UDim2.fromScale(it.x + math.sin(t * 1.5 + it.ph) * 0.01, it.y)
+            it.l.Rotation = math.sin(t * 2 + it.ph) * 20
+        elseif it.l.Visible then
+            it.l.Visible = false
+        end
+    end
+
+    if hw.lightning and t > hw.nextFlash then
+        hw.nextFlash = t + 6 + math.random() * 9
+        task.spawn(function()
+            for _ = 1, math.random(1, 3) do
+                X.HWFlash.BackgroundTransparency = 0.55
+                tween(X.HWFlash, 0.3, {BackgroundTransparency = 1})
+                task.wait(0.18 + math.random() * 0.15)
+            end
+        end)
+    end
+
+    if hw.atmos then
+        Lighting.ClockTime = 0
+        Lighting.Ambient = Color3.fromRGB(86, 40, 104)
+        Lighting.OutdoorAmbient = Color3.fromRGB(64, 28, 84)
+        Lighting.FogColor = Color3.fromRGB(58, 22, 8)
+        Lighting.FogStart = 30
+        Lighting.FogEnd = 450
+        Lighting.Brightness = 1.3
+    end
+
+    for _, a in pairs(X.HWAuras) do
+        if a.on then
+            local root = getRoot()
+            if root then
+                local stale = #a.items ~= a.n
+                for _, b in ipairs(a.items) do
+                    if b.Parent ~= root then stale = true end
+                end
+                if stale then
+                    for _, b in ipairs(a.items) do pcall(function() b:Destroy() end) end
+                    a.items = {}
+                    for i = 1, a.n do
+                        local bb = new("BillboardGui", {
+                            Name = "LostHubAura",
+                            Size = UDim2.fromOffset(30, 30),
+                            AlwaysOnTop = true,
+                            Adornee = root,
+                        }, root)
+                        new("TextLabel", {
+                            Size = UDim2.new(1, 0, 1, 0),
+                            BackgroundTransparency = 1,
+                            Text = a.emoji,
+                            TextSize = 22,
+                        }, bb)
+                        a.items[i] = bb
+                    end
+                end
+                for i, b in ipairs(a.items) do
+                    local ang = t * a.speed + i * math.pi * 2 / a.n
+                    b.StudsOffset = Vector3.new(math.cos(ang) * 3.2, 2.2 + math.sin(t * 3 + i) * 0.7, math.sin(ang) * 3.2)
+                end
+            end
+        end
+    end
+
+    local char = getChar()
+    if char then
+        if hw.body then
+            local col = Color3.fromRGB(255, 110 + math.floor(math.sin(t * 3) * 30), 10)
+            for _, p in ipairs(char:GetDescendants()) do
+                if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
+                    if not hw.bodySaved[p] then hw.bodySaved[p] = {p.Color, p.Material} end
+                    p.Material = Enum.Material.Neon
+                    p.Color = col
+                end
+            end
+        end
+        if hw.ghost then
+            hw.ghostApplied = true
+            for _, p in ipairs(char:GetDescendants()) do
+                if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then p.LocalTransparencyModifier = 0.6 end
+            end
+        elseif hw.ghostApplied then
+            hw.ghostApplied = false
+            for _, p in ipairs(char:GetDescendants()) do
+                if p:IsA("BasePart") then p.LocalTransparencyModifier = 0 end
+            end
+        end
+    end
+end)
+
+-- blocos de ESP/atalhos de evento (usado na aba Halloween e no modulo Universal)
+function X.hwEventBlock(page)
+    UI.Section(page, "EVENTO DE HALLOWEEN")
+    local groups = {
+        {"🎃 Aboboras", {"pumpkin", "abobora", "jack", "gourd"}},
+        {"🍬 Doces / Trick or Treat", {"candy", "sweet", "treat", "doce", "lollipop", "bag", "sack"}},
+        {"👻 Fantasmas / Monstros", {"ghost", "zombie", "skeleton", "vampire", "witch", "monster", "bat", "spider"}},
+        {"🎁 Baus / Presentes de evento", {"chest", "crate", "loot", "gift", "present"}},
+    }
+    local all = {}
+    for _, g in ipairs(groups) do
+        for _, k in ipairs(g[2]) do table.insert(all, k) end
+        UI.Button(page, "👁  ESP: " .. g[1], function()
+            setKeywords(g[2])
+            preset({obj_esp = true})
+            notify("ESP", g[1] .. " ligado.", 2, "ok")
+        end)
+        UI.Button(page, "📍  Ir ate: " .. g[1], function()
+            local p = nearestObj(function(d) return nameHas(d, g[2]) end)
+            if p then tpTo(p.Position) else notify(g[1], "Nada encontrado.", 3, "err") end
+        end)
+    end
+    UI.Button(page, "🧲  ESP + auto coletar tudo (aboboras, doces, baus)", function()
+        setKeywords(all)
+        preset({obj_esp = true, autocollect = true, antiafk = true})
+        notify("Evento", "ESP e auto coleta ligados.", 3, "ok")
+    end)
+    UI.Button(page, "🤏  Prompts instantaneos + automaticos", function()
+        preset({instaprompt = true, autoprompt = true})
+    end)
+    UI.Button(page, "⛔  Desligar ESP / coleta", function()
+        preset({obj_esp = false, autocollect = false, instaprompt = false, autoprompt = false})
+    end)
+    UI.Label(page, "Nomes de objetos mudam de jogo para jogo. Se algo nao aparecer, use o SCANNER na aba MUNDO.", 28)
+end
+
+do
+    local P = Halloween
+
+    local function countdownText()
+        local d = os.date("!*t")
+        if d.month == 10 and d.day == 31 then
+            return "🎃 HOJE E HALLOWEEN! Feliz Halloween!"
+        end
+        local y = d.year
+        local today = os.time({year = d.year, month = d.month, day = d.day, hour = 12})
+        local target = os.time({year = y, month = 10, day = 31, hour = 12})
+        if target < today then
+            target = os.time({year = y + 1, month = 10, day = 31, hour = 12})
+        end
+        local days = math.floor((target - today) / 86400 + 0.5)
+        return "🎃 Faltam " .. days .. (days == 1 and " dia" or " dias") .. " para o Halloween (31/10)!"
+    end
+    local cd = UI.Label(P, countdownText(), 18)
+    cd.TextColor3 = C.accent
+    cd.TextSize = 12
+    cd.Font = Enum.Font.GothamBold
+    onAccent(function(col) cd.TextColor3 = col end)
+
+    UI.Section(P, "ATMOSFERA ASSOMBRADA (so no seu cliente)")
+    UI.Toggle(P, "🌙 Noite assombrada (ceu escuro, nevoa laranja)", false, function(on) X.hwAtmos(on) end, "hw_atmos")
+    UI.Toggle(P, "🎃 Chuva de Halloween (emojis caindo na tela)", false, function(on) X.HW.rain = on end, "hw_rain")
+    UI.Toggle(P, "⚡ Relampagos (flashes na tela)", false, function(on) X.HW.lightning = on end, "hw_light")
+    UI.Button(P, "🕯  Clima completo (noite + chuva + relampagos)", function()
+        preset({hw_atmos = true, hw_rain = true, hw_light = true})
+        notify("Halloween", "Clima assombrado ligado!", 3, "ok")
+    end)
+    UI.Button(P, "☀  Desligar clima", function()
+        preset({hw_atmos = false, hw_rain = false, hw_light = false})
+    end)
+
+    UI.Section(P, "MEU PERSONAGEM")
+    UI.Toggle(P, "🎃 Corpo abobora (neon laranja pulsando)", false, function(on)
+        X.HW.body = on
+        if not on then X.hwBodyRestore() end
+    end, "hw_body")
+    UI.Toggle(P, "👻 Fantasma (meio transparente, so voce ve)", false, function(on) X.HW.ghost = on end, "hw_ghost")
+    UI.Toggle(P, "🦇 Aura de morcegos (orbitam voce)", false, function(on) X.hwAura("bats", on) end, "hw_bats")
+    UI.Toggle(P, "👻 Aura de fantasmas", false, function(on) X.hwAura("ghosts", on) end, "hw_ghosts")
+    UI.Toggle(P, "🎃 Aura de aboboras", false, function(on) X.hwAura("pumpkins", on) end, "hw_pumpkins")
+    UI.Button(P, "👻  Modo Fantasma (fly + noclip + transparente)", function()
+        preset({hw_ghost = true, fly = true, noclip = true}, {flyv = 40})
+    end)
+    UI.Button(P, "🧹  Modo Vassoura (fly + speed)", function()
+        preset({fly = true, speed = true}, {flyv = 70, speedv = 40})
+        notify("Vassoura", "Voe com WASD, Espaco e Shift.", 3, "ok")
+    end)
+    UI.Button(P, "🧟  Modo Zumbi (speed baixo + pulo baixo)", function()
+        preset({speed = true, jump = true}, {speedv = 12, jumpv = 35})
+    end)
+    UI.Button(P, "⛔  Desligar modos", function()
+        preset({hw_ghost = false, hw_body = false, hw_bats = false, hw_ghosts = false, hw_pumpkins = false, fly = false, noclip = false, speed = false, jump = false})
+    end)
+
+    UI.Section(P, "VISUAL")
+    UI.Button(P, "👁  ESP completo laranja (jogadores)", function()
+        preset({esp_chams = true, esp_box = true, esp_name = true, esp_health = true, esp_trace = true})
+    end)
+    for _, th in ipairs({
+        {"🎃 Tema Abobora", Color3.fromRGB(255, 122, 24)},
+        {"🔮 Tema Roxo bruxa", Color3.fromRGB(170, 96, 255)},
+        {"🧪 Tema Verde slime", Color3.fromRGB(110, 235, 70)},
+        {"🩸 Tema Sangue", Color3.fromRGB(226, 50, 56)},
+        {"👻 Tema Fantasma", Color3.fromRGB(235, 235, 245)},
+    }) do
+        UI.Button(P, th[1], function()
+            State.Rainbow = false
+            if Toggles.rainbow then Toggles.rainbow.Set(false, true) end
+            setAccent(th[2])
+        end)
+    end
+
+    X.hwEventBlock(P)
+    X.musicBlock(P)
 end
 
 --==================================================
@@ -5740,7 +6158,8 @@ do
         {Name = "Universal", Desc = "Funciona em qualquer jogo",
             Ids = {}, Keys = {},
             Build = builder({
-                info = "Tudo do hub funciona aqui: veja as abas PRINCIPAL, VISUAL, COMBATE, TROLL e MUNDO.",
+                info = "Tudo do hub funciona aqui: veja as abas PRINCIPAL, HALLOWEEN, VISUAL, COMBATE, TROLL e MUNDO.",
+                custom = function(page) X.hwEventBlock(page) end,
                 shooter = true, explore = true,
             })},
     }
@@ -5903,22 +6322,22 @@ local unload  -- definida mais abaixo
 
 do
     local Themes = {
-        {"Cinza",    Color3.fromRGB(185, 185, 190)},
-        {"Vermelho", Color3.fromRGB(225, 70, 80)},
-        {"Azul",     Color3.fromRGB(80, 150, 255)},
-        {"Roxo",     Color3.fromRGB(165, 100, 255)},
-        {"Verde",    Color3.fromRGB(80, 225, 140)},
-        {"Ciano",    Color3.fromRGB(70, 220, 230)},
-        {"Laranja",  Color3.fromRGB(255, 160, 60)},
-        {"Rosa",     Color3.fromRGB(255, 110, 190)},
-        {"Dourado",  Color3.fromRGB(240, 200, 90)},
-        {"Branco",   Color3.fromRGB(250, 250, 250)},
+        {"Abobora",      Color3.fromRGB(255, 122, 24)},
+        {"Roxo bruxa",   Color3.fromRGB(170, 96, 255)},
+        {"Verde slime",  Color3.fromRGB(110, 235, 70)},
+        {"Sangue",       Color3.fromRGB(226, 50, 56)},
+        {"Fantasma",     Color3.fromRGB(235, 235, 245)},
+        {"Cobre",        Color3.fromRGB(205, 120, 70)},
+        {"Meia-noite",   Color3.fromRGB(90, 120, 255)},
+        {"Doce rosa",    Color3.fromRGB(255, 110, 190)},
+        {"Ouro",         Color3.fromRGB(240, 200, 90)},
+        {"Cinza",        Color3.fromRGB(185, 185, 190)},
     }
     local ThemeNames = {}
     for _, t in ipairs(Themes) do table.insert(ThemeNames, t[1]) end
 
     UI.Section(Config, "APARENCIA")
-    UI.Cycle(Config, "Tema", ThemeNames, "Cinza", function(name)
+    UI.Cycle(Config, "Tema", ThemeNames, "Abobora", function(name)
         for _, t in ipairs(Themes) do
             if t[1] == name then
                 State.Rainbow = false
@@ -5952,7 +6371,7 @@ do
     end)
 
     UI.Section(Config, "PERFIL")
-    local CFG_FILE = "LostHub_v5.json"
+    local CFG_FILE = "LostHub_HW.json"
     UI.Button(Config, "💾  Salvar configuracao", function()
         if not writefile then
             notify("Config", "Seu executor nao suporta writefile.", 4, "err")
@@ -5995,17 +6414,35 @@ do
         end
     end)
 
+    UI.Button(Config, "🎯  Centralizar menu e bolinha", function()
+        Main.Position = UDim2.new(0.5, 0, 0.5, 0)
+        local mini = Gui:FindFirstChild("Mini")
+        if mini then mini.Position = UDim2.new(0.5, 0, 0.5, 0) end
+        notify("Menu", "Menu centralizado.", 2, "ok")
+    end)
+    local hotkeys = false
+    UI.Toggle(Config, "Atalhos de teclado: F = Fly, N = Noclip, V = Speed", false, function(on) hotkeys = on end)
+    bind(UserInputService.InputBegan, function(input, processed)
+        if processed or not hotkeys then return end
+        local map = {[Enum.KeyCode.F] = "fly", [Enum.KeyCode.N] = "noclip", [Enum.KeyCode.V] = "speed"}
+        local k = map[input.KeyCode]
+        if k and Toggles[k] then Toggles[k].Set(not Toggles[k].Get()) end
+    end)
+
     UI.Section(Config, "COMPATIBILIDADE DO EXECUTOR")
     local function yn(f) return f and "✓" or "✕" end
     UI.Label(Config, ("firetouchinterest %s • fireproximityprompt %s • mouse1click %s\nsetclipboard %s • writefile %s • readfile %s • gethui %s • setfpscap %s"):format(
         yn(firetouchinterest), yn(fireproximityprompt), yn(mouse1click),
         yn(setclipboard), yn(writefile), yn(readfile), yn(gethui), yn(setfpscap)), 30)
 
-    UI.Section(Config, "NOVIDADES DA V5")
-    UI.Label(Config, "• Loading e tela de key novos (lembrar key, tentativas, bloqueio)\n• Anti Void, protecao de queda, auto rejoin e server hop automatico\n• Alerta de inimigo, 3 slots de posicao, jogadores proximos\n• Mais opcoes em cada jogo + Booga Booga, Bee Swarm e Build A Boat", 70)
+    UI.Section(Config, "EDICAO HALLOWEEN")
+    UI.Label(Config, "• Tema laranja e roxo, abobora na tela de carregamento e portal da key
+• Aba HALLOWEEN: noite assombrada, chuva de emojis, relampagos, corpo abobora e fantasma
+• ESP de aboboras e doces + playlists de terror
+• Tudo da v5.1 incluso (30 jogos, otimizacao, musica)", 70)
 
     UI.Section(Config, "SOBRE")
-    UI.Label(Config, "Lost Hub v5 • " .. #Games .. " modulos de jogos • key: Lost", 16)
+    UI.Label(Config, "Lost Hub Halloween 🎃 • " .. #Games .. " modulos de jogos • key: Lost", 16)
     UI.Label(Config, "Modulos especificos usam nomes de objetos do jogo. Se o jogo atualizar, algo pode parar de funcionar.", 40)
     UI.Button(Config, "🗑  Descarregar Lost Hub (restaura tudo)", function() unload() end)
 end
@@ -6145,6 +6582,19 @@ table.insert(Ticks, function()
     end
 end)
 
+-- zoom segurando C
+table.insert(Ticks, function()
+    if not X.zoomC then return end
+    local cam = workspace.CurrentCamera
+    if UserInputService:IsKeyDown(Enum.KeyCode.C) and not UserInputService:GetFocusedTextBox() then
+        cam.FieldOfView = 25
+        X.zoomActive = true
+    elseif X.zoomActive then
+        X.zoomActive = false
+        cam.FieldOfView = State.CamFov and State.CamFovVal or 70
+    end
+end)
+
 -- ANTI AFK
 bind(LocalPlayer.Idled, function()
     if not State.AntiAFK then return end
@@ -6221,9 +6671,11 @@ bind(UserInputService.InputChanged, function(input)
     if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
         or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - dragStart
+        local vp = workspace.CurrentCamera.ViewportSize
+        local mx, my = math.max(vp.X / 2 - 90, 0), math.max(vp.Y / 2 - 40, 0)
         Main.Position = UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + delta.X,
-            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            0.5, math.clamp(startPos.X.Offset + delta.X, -mx, mx),
+            0.5, math.clamp(startPos.Y.Offset + delta.Y, -my, my)
         )
     end
 end)
@@ -6275,13 +6727,17 @@ local function setVisible(v)
     shown = v
 
     if v then
-        Main.Position = Mini.Position
+        Main.Position = UDim2.new(0.5, 0, 0.5, 0)
         Mini.Visible = false
         Main.Visible = true
         MainScale.Scale = 0.8
         tween(MainScale, 0.4, {Scale = UIBase}, Enum.EasingStyle.Back)
     else
-        Mini.Position = Main.Position
+        local vp = workspace.CurrentCamera.ViewportSize
+        Mini.Position = UDim2.new(
+            0.5, math.clamp(Main.Position.X.Offset, -(vp.X / 2 - 30), vp.X / 2 - 30),
+            0.5, math.clamp(Main.Position.Y.Offset, -(vp.Y / 2 - 30), vp.Y / 2 - 30)
+        )
         tween(MainScale, 0.2, {Scale = 0.8})
         task.delay(0.2, function()
             if not shown then Main.Visible = false end
@@ -6316,9 +6772,11 @@ bind(UserInputService.InputChanged, function(input)
         local delta = input.Position - miniStart
         if delta.Magnitude > 4 then miniMoved = true end
         if miniMoved then
+            local vp = workspace.CurrentCamera.ViewportSize
+            local mx, my = math.max(vp.X / 2 - 30, 0), math.max(vp.Y / 2 - 30, 0)
             Mini.Position = UDim2.new(
-                miniStartPos.X.Scale, miniStartPos.X.Offset + delta.X,
-                miniStartPos.Y.Scale, miniStartPos.Y.Offset + delta.Y
+                0.5, math.clamp(miniStartPos.X.Offset + delta.X, -mx, mx),
+                0.5, math.clamp(miniStartPos.Y.Offset + delta.Y, -my, my)
             )
         end
     end
@@ -6362,6 +6820,8 @@ unload = function()
 
     pcall(function() X.musicStop() X.MusicSound:Destroy() end)
     pcall(X.optRestoreAll)
+    pcall(X.hwOff)
+    pcall(function() X.HWGui:Destroy() end)
     pcall(clearFly)
     pcall(restoreHitbox)
     pcall(clearObj)
@@ -6404,16 +6864,16 @@ Close.MouseButton1Click:Connect(function() unload() end)
 --==================================================
 -- INICIAR
 --==================================================
-showPage("Principal", "Principal")
+showPage("Halloween", "Halloween")
 
 task.delay(0.8, function()
     if detected then
-        notify("Lost Hub v5", "Jogo detectado: " .. detected.Name .. ". Veja a aba SCRIPTS.", 4, "ok")
+        notify("Lost Hub 🎃", "Jogo detectado: " .. detected.Name .. ". Veja a aba SCRIPTS.", 4, "ok")
     else
-        notify("Lost Hub v5", "Carregado! Use as abas ou o modulo Universal.", 3, "ok")
+        notify("Lost Hub 🎃", "Feliz Halloween! Veja a aba HALLOWEEN.", 3, "ok")
     end
 end)
 
 print("================================")
-print("     LOST HUB v5 CARREGADO")
+print("     LOST HUB HALLOWEEN CARREGADO")
 print("================================")
