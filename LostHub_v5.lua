@@ -6436,10 +6436,7 @@ do
         yn(setclipboard), yn(writefile), yn(readfile), yn(gethui), yn(setfpscap)), 30)
 
     UI.Section(Config, "EDICAO HALLOWEEN")
-    UI.Label(Config, "• Tema laranja e roxo, abobora na tela de carregamento e portal da key
-• Aba HALLOWEEN: noite assombrada, chuva de emojis, relampagos, corpo abobora e fantasma
-• ESP de aboboras e doces + playlists de terror
-• Tudo da v5.1 incluso (30 jogos, otimizacao, musica)", 70)
+    UI.Label(Config, "• Tema laranja e roxo, abobora na tela de carregamento e portal da key\n• Aba HALLOWEEN: noite assombrada, chuva de emojis, relampagos, corpo abobora e fantasma\n• ESP de aboboras e doces + playlists de terror\n• Tudo da v5.1 incluso (30 jogos, otimizacao, musica)", 70)
 
     UI.Section(Config, "SOBRE")
     UI.Label(Config, "Lost Hub Halloween 🎃 • " .. #Games .. " modulos de jogos • key: Lost", 16)
