@@ -4877,6 +4877,220 @@ do
 end
 
 --==================================================
+-- AUTO FARM GENERICO (objeto em objeto + NPC / boss)
+--==================================================
+function X.tpFarmBlock(page, defaultKws)
+    local cfg = {on = false, delay = 0.8, range = 500, custom = {}, visited = {}}
+    UI.Section(page, "AUTO FARM: OBJETO EM OBJETO")
+    UI.Label(page, "Teleporta de objeto em objeto (moedas, orbs, frutas, baus...) e coleta por toque e prompt. Use as palavras do jogo ou digite as suas.", 40)
+    UI.TextInput(page, "Palavras-chave (virgula). Vazio = padrao do jogo", "", function(txt)
+        local list = {}
+        for w in string.gmatch(txt, "[^,]+") do
+            local s = w:lower():gsub("^%s+", ""):gsub("%s+$", "")
+            if #s > 0 then table.insert(list, s) end
+        end
+        cfg.custom = list
+    end)
+    UI.Toggle(page, "Auto Farm (teleporta e coleta)", false, function(v)
+        cfg.on = v
+        if v and not (firetouchinterest or fireproximityprompt) then
+            notify("Aviso", "Seu executor nao suporta firetouchinterest/fireproximityprompt.", 4, "err")
+        end
+    end)
+    UI.Slider(page, "Intervalo entre objetos (decimos de seg)", 2, 30, 8, function(v) cfg.delay = v / 10 end)
+    UI.Slider(page, "Alcance maximo (studs)", 50, 2000, 500, function(v) cfg.range = v end)
+
+    task.spawn(function()
+        local list, listAt = {}, 0
+        while alive do
+            if cfg.on then
+                local kws = (#cfg.custom > 0) and cfg.custom or defaultKws or {}
+                if #kws == 0 then
+                    notify("Auto Farm", "Defina palavras-chave primeiro.", 3, "err")
+                    task.wait(3)
+                else
+                    if os.clock() - listAt > 3 then
+                        local out, n = {}, 0
+                        for _, d in ipairs(workspace:GetDescendants()) do
+                            n = n + 1
+                            if n % 4000 == 0 then task.wait() end
+                            if (d:IsA("BasePart") or d:IsA("Model")) and nameHas(d, kws) then
+                                local m = d:FindFirstAncestorOfClass("Model")
+                                if not (m and Players:GetPlayerFromCharacter(m)) then
+                                    table.insert(out, d)
+                                    if #out >= 500 then break end
+                                end
+                            end
+                        end
+                        list, listAt = out, os.clock()
+                    end
+                    local r = getRoot()
+                    if r then
+                        local best, bp, bd
+                        for _, o in ipairs(list) do
+                            local seen = cfg.visited[o]
+                            if o.Parent and not (seen and os.clock() - seen < 6) then
+                                local p = partOf(o)
+                                if p then
+                                    local d = (p.Position - r.Position).Magnitude
+                                    if d <= cfg.range and (not bd or d < bd) then
+                                        best, bp, bd = o, p, d
+                                    end
+                                end
+                            end
+                        end
+                        if best then
+                            cfg.visited[best] = os.clock()
+                            r.CFrame = CFrame.new(bp.Position + Vector3.new(0, 3, 0))
+                            r.AssemblyLinearVelocity = Vector3.zero
+                            if firetouchinterest then
+                                pcall(function()
+                                    firetouchinterest(r, bp, 0)
+                                    task.wait()
+                                    firetouchinterest(r, bp, 1)
+                                end)
+                            end
+                            if fireproximityprompt then
+                                local pp = best:FindFirstChildWhichIsA("ProximityPrompt", true)
+                                    or (best.Parent and best.Parent:FindFirstChildWhichIsA("ProximityPrompt", true))
+                                if pp then pcall(fireproximityprompt, pp) end
+                            end
+                        end
+                    end
+                    task.wait(cfg.delay)
+                end
+            else
+                task.wait(0.4)
+            end
+        end
+    end)
+end
+
+function X.mobFarmBlock(page)
+    local cfg = {on = false, name = "", dist = 6, height = 0, pos = "Atras", cps = 12, pick = "Mais perto", equip = true}
+    local cache, cacheAt = {}, 0
+
+    local function refreshMobs()
+        local out, n = {}, 0
+        for _, d in ipairs(workspace:GetDescendants()) do
+            n = n + 1
+            if n % 4000 == 0 then task.wait() end
+            if d:IsA("Humanoid") and d.Health > 0 then
+                local m = d.Parent
+                if m and m:IsA("Model") and not Players:GetPlayerFromCharacter(m) then
+                    local r = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or partOf(m)
+                    if r then table.insert(out, {m = m, h = d, r = r}) end
+                end
+            end
+        end
+        cache, cacheAt = out, os.clock()
+    end
+
+    local function mobNames()
+        refreshMobs()
+        local seen, list = {}, {}
+        for _, e in ipairs(cache) do
+            if not seen[e.m.Name] then
+                seen[e.m.Name] = true
+                table.insert(list, e.m.Name)
+            end
+        end
+        table.sort(list)
+        local out = {"(qualquer NPC)"}
+        for i = 1, math.min(#list, 60) do table.insert(out, list[i]) end
+        return out
+    end
+
+    local function pickTarget()
+        local r = getRoot()
+        if not r then return end
+        local best, bs
+        for _, e in ipairs(cache) do
+            if e.h.Parent and e.h.Health > 0 and e.r.Parent then
+                if cfg.name == "" or e.m.Name:lower():find(cfg.name, 1, true) then
+                    local score = (e.r.Position - r.Position).Magnitude
+                    if cfg.pick == "Menos vida" then
+                        score = e.h.Health
+                    elseif cfg.pick == "Mais vida" then
+                        score = -e.h.Health
+                    elseif cfg.pick == "Boss (mais vida max)" then
+                        score = -e.h.MaxHealth
+                    end
+                    if not bs or score < bs then best, bs = e, score end
+                end
+            end
+        end
+        return best
+    end
+
+    UI.Section(page, "AUTO FARM DE NPC / BOSS")
+    UI.Label(page, "Escolha qual NPC ou boss farmar na lista (ela mostra os NPCs que existem no mapa agora) ou digite parte do nome. O hub teleporta ate ele e ataca.", 40)
+    UI.Dropdown(page, "Escolher NPC / boss do mapa", mobNames, function(name)
+        if name == "(qualquer NPC)" then
+            cfg.name = ""
+        else
+            cfg.name = name:lower()
+        end
+        notify("Farm", "Alvo: " .. name, 2, "ok")
+    end)
+    UI.TextInput(page, "Ou digite parte do nome (ex: boss, bandit)...", "", function(txt) cfg.name = txt:lower() end)
+    UI.Toggle(page, "Auto Farm de NPC (teleporta + ataca)", false, function(v) cfg.on = v end)
+    UI.Toggle(page, "Equipar ferramenta automaticamente", true, function(v) cfg.equip = v end)
+    UI.Cycle(page, "Prioridade", {"Mais perto", "Menos vida", "Mais vida", "Boss (mais vida max)"}, cfg.pick, function(v) cfg.pick = v end)
+    UI.Cycle(page, "Posicao em relacao ao NPC", {"Atras", "Acima", "Frente"}, cfg.pos, function(v) cfg.pos = v end)
+    UI.Slider(page, "Distancia do NPC", 2, 25, cfg.dist, function(v) cfg.dist = v end)
+    UI.Slider(page, "Altura extra", -5, 20, cfg.height, function(v) cfg.height = v end)
+    UI.Slider(page, "Ataques por segundo", 1, 30, cfg.cps, function(v) cfg.cps = v end)
+    UI.Button(page, "📋  Listar NPCs do mapa (notificacao)", function()
+        local names = mobNames()
+        table.remove(names, 1)
+        notify("NPCs no mapa", (#names == 0) and "nenhum encontrado" or table.concat(names, ", "), 8)
+    end)
+
+    task.spawn(function()
+        while alive do
+            if cfg.on then
+                if os.clock() - cacheAt > 2 then refreshMobs() end
+                local t = pickTarget()
+                local r, h, char = getRoot(), getHum(), getChar()
+                if t and r and h then
+                    if cfg.equip and char and not char:FindFirstChildOfClass("Tool") then
+                        local bp = LocalPlayer:FindFirstChild("Backpack")
+                        local tool = bp and bp:FindFirstChildOfClass("Tool")
+                        if tool then pcall(function() h:EquipTool(tool) end) end
+                    end
+                    local tp = t.r.Position
+                    local cf
+                    if cfg.pos == "Acima" then
+                        cf = CFrame.new(tp + Vector3.new(0, cfg.dist + cfg.height, 0))
+                    elseif cfg.pos == "Frente" then
+                        cf = t.r.CFrame * CFrame.new(0, cfg.height, -cfg.dist)
+                    else
+                        cf = t.r.CFrame * CFrame.new(0, cfg.height, cfg.dist)
+                    end
+                    r.CFrame = CFrame.lookAt(cf.Position, tp)
+                    r.AssemblyLinearVelocity = Vector3.zero
+                    local tool = char and char:FindFirstChildOfClass("Tool")
+                    if tool then pcall(function() tool:Activate() end) end
+                    pcall(function()
+                        if mouse1click then
+                            mouse1click()
+                        else
+                            VirtualUser:ClickButton1(Vector2.new())
+                        end
+                    end)
+                    task.wait(1 / math.max(cfg.cps, 1))
+                else
+                    task.wait(0.4)
+                end
+            else
+                task.wait(0.4)
+            end
+        end
+    end)
+end
+
+--==================================================
 -- JOGOS: BUILDERS + REGISTRO
 --==================================================
 local Games = {}
@@ -5073,7 +5287,9 @@ do
                     for _, k in ipairs(g[2]) do table.insert(all, k) end
                 end
                 farmBlock(page, all)
+                X.tpFarmBlock(page, all)
             end
+            if opts.mobfarm then X.mobFarmBlock(page) end
             if not opts.nomove then moveModeButtons(page) end
             if opts.explore then exploreBlock(page) end
             utilBlock(page)
@@ -5709,6 +5925,7 @@ do
         {Name = "Blox Fruits", Desc = "Frutas, aviso de fruta, baus, bosses e auto coletar",
             Ids = {2753915549, 4442272183, 7449423635}, Keys = {"blox fruits"},
             Build = builder({
+                mobfarm = true,
                 info = "Ferramentas client-side: achar frutas e baus. Auto farm exige remotes especificos e nao esta incluso.", infoH = 40,
                 groups = {{"Frutas", {"fruit"}}, {"Baus", {"chest"}}, {"NPCs / Bosses", {"boss", "quest"}}, {"Espadas / Itens", {"sword", "material"}}},
                 custom = function(page)
@@ -6034,7 +6251,8 @@ do
                 }})},
         {Name = "Dead Rails", Desc = "ESP de bonds, baus, armas, trem, noite e AFK",
             Ids = {116495829188952}, Keys = {"dead rails"},
-            Build = builder({info = "Coleta de itens e ESP de objetos.", farm = true,
+            Build = builder({
+                mobfarm = true,info = "Coleta de itens e ESP de objetos.", farm = true,
                 custom = function(page)
                     UI.Section(page, "SOBREVIVENCIA")
                     UI.Button(page, "💡  Fullbright + sem neblina", function()
@@ -6056,6 +6274,7 @@ do
         {Name = "99 Nights in the Forest", Desc = "ESP de itens, criancas, fogueira, baus, noite e prompts",
             Ids = {126509999114328}, Keys = {"99 nights"},
             Build = builder({
+                mobfarm = true,
                 info = "Sobrevivencia: ESP de itens, criancas perdidas, fogueira e coleta automatica.", infoH = 30,
                 farm = true,
                 groups = {
@@ -6092,6 +6311,7 @@ do
         {Name = "Booga Booga", Desc = "ESP de arvores, pedras, ferro, ouro, cristais e auto coletar",
             Ids = {11729688377}, Keys = {"booga booga"},
             Build = builder({
+                mobfarm = true,
                 info = "Sobrevivencia: ESP de recursos e coleta. Nomes podem variar; ajuste pelo SCANNER se preciso.", infoH = 30,
                 farm = true,
                 groups = {
@@ -6213,6 +6433,7 @@ do
         {Name = "Combat Warriors", Desc = "ESP, aimbot legit, alerta de inimigo, armas e movimentacao",
             Ids = {4282985734}, Keys = {"combat warriors"},
             Build = builder({
+                mobfarm = true,
                 info = "Luta com armas brancas e distancia: ESP, alertas e presets. Anti-cheat ativo, prefira Legit.", infoH = 30,
                 shooter = true,
                 groups = {{"Armas no chao", {"sword", "pistol", "rifle", "shotgun", "bow", "axe"}}, {"Baus", {"chest", "crate"}}},
@@ -6268,6 +6489,299 @@ do
             })},
     }
 
+    -- ===== GENEROS: kits completos reaproveitados por varios jogos =====
+    local GENRE = {}
+    local function espWords(words)
+        setKeywords(words)
+        preset({obj_esp = true})
+    end
+
+    GENRE.sim = {
+        info = "Simulator: auto farm de coleta (objeto em objeto), clicker, prompts e ESP. Os nomes dos objetos variam; ajuste pelo SCANNER na aba MUNDO.",
+        farm = true,
+        groups = {
+            {"Moedas / Dinheiro", {"coin", "cash", "money"}}, {"Gemas / Orbs", {"gem", "orb", "crystal", "diamond"}},
+            {"Baus", {"chest", "crate"}}, {"Ovos / Pets", {"egg", "pet"}}, {"Presentes", {"gift", "present"}},
+        },
+        custom = function(page)
+            UI.Section(page, "SIMULATOR")
+            UI.Button(page, "⚙  Auto Farm total (clicker + prompts + coleta + anti AFK)", function()
+                setKeywords({"coin", "cash", "gem", "orb", "crystal", "chest"})
+                preset({autoclick = true, instaprompt = true, autoprompt = true, autocollect = true, antiafk = true, obj_esp = true})
+                notify("Simulator", "Farm total ligado.", 3, "ok")
+            end)
+            UI.Button(page, "🥚  ESP de ovos e baus", function() espWords({"egg", "chest", "crate"}) end)
+            UI.Button(page, "🏃  Speed 30 + anti void", function() preset({speed = true, antivoid = true}, {speedv = 30}) end)
+        end,
+    }
+
+    GENRE.tycoon = {
+        info = "Tycoon: coleta de dinheiro, toque automatico nos botoes de compra e AFK farm. Ajuste os nomes pelo SCANNER se preciso.",
+        farm = true,
+        groups = {
+            {"Dinheiro / Coletor", {"cash", "collect", "money", "register"}}, {"Botoes de compra", {"button", "purchase", "buy", "pad"}},
+            {"Baus / Premios", {"chest", "gift", "reward"}},
+        },
+        custom = function(page)
+            UI.Section(page, "TYCOON")
+            UI.Button(page, "🛒  Auto comprar (toca nos botoes e coleta dinheiro)", function()
+                setKeywords({"button", "buy", "purchase", "collect", "cash"})
+                State.CollectRange = 150
+                preset({autocollect = true, obj_esp = true, antiafk = true})
+                notify("Tycoon", "Auto compra ligado (alcance 150).", 3, "ok")
+            end)
+            UI.Button(page, "💰  Modo AFK Tycoon (anti AFK + auto rejoin + prompts)", function()
+                preset({antiafk = true, autorejoin = true, instaprompt = true, autoprompt = true})
+            end)
+        end,
+    }
+
+    GENRE.rp = {
+        info = "Roleplay / social: explorar, trabalhos por prompt, brincadeiras e ferramentas de jogadores.",
+        explore = true,
+        groups = {
+            {"Dinheiro / Trabalho", {"cash", "money", "job", "work", "paycheck", "tip"}}, {"Carros", {"car", "vehicle"}},
+        },
+        custom = function(page)
+            UI.Section(page, "ROLEPLAY")
+            UI.Button(page, "💼  Trabalhos automaticos (prompts instantaneos + automaticos)", function()
+                preset({instaprompt = true, autoprompt = true, antiafk = true})
+            end)
+            UI.Button(page, "🌈  Modo Festa (spin + neon)", function() preset({spin = true, neon = true}) end)
+            UI.Button(page, "🛡  Anti fling + anti AFK", function() preset({antifling = true, antiafk = true}) end)
+            UI.Button(page, "🚗  Ir ate o carro mais proximo", function()
+                local p = nearestObj(function(d) return nameHas(d, {"car", "vehicle"}) end)
+                if p then tpTo(p.Position) else notify("Carro", "Nenhum carro encontrado.", 3, "err") end
+            end)
+        end,
+    }
+
+    GENRE.racing = {
+        info = "Corrida / veiculos: speed por CFrame, carros, dinheiro e checkpoints.",
+        explore = true,
+        groups = {
+            {"Carros", {"car", "vehicle"}}, {"Dinheiro", {"cash", "money", "coin"}}, {"Checkpoints", {"checkpoint", "finish"}},
+        },
+        custom = function(page)
+            UI.Section(page, "CORRIDA")
+            UI.Button(page, "🚗  Ir ate o carro mais proximo", function()
+                local p = nearestObj(function(d) return nameHas(d, {"car", "vehicle"}) end)
+                if p then tpTo(p.Position) else notify("Carro", "Nenhum carro encontrado.", 3, "err") end
+            end)
+            UI.Button(page, "💨  Speed por CFrame (80)", function()
+                State.SpeedMode = "CFrame"
+                preset({speed = true}, {speedv = 80})
+            end)
+            UI.Button(page, "🛡  Anti void + anti AFK", function() preset({antivoid = true, antiafk = true}) end)
+        end,
+    }
+
+    GENRE.shooter = {
+        info = "FPS / tiro: presets de aimbot, ESP, trigger e alertas. Anti-cheat varia de jogo para jogo, prefira Legit.",
+        shooter = true,
+        nomove = true,
+        groups = {{"Armas / Itens no chao", {"gun", "rifle", "pistol", "ammo", "medkit", "weapon"}}},
+        custom = function(page)
+            UI.Section(page, "TIRO")
+            UI.Button(page, "👁  ESP + alerta (80 studs)", function()
+                preset({esp_name = true, esp_health = true, esp_box = true, enemyalert = true}, {alertdist = 80})
+            end)
+            UI.Button(page, "⚡  Speed 24 + Bunny Hop", function() preset({speed = true, bhop = true}, {speedv = 24}) end)
+            UI.Button(page, "🛡  Anti fling + anti AFK", function() preset({antifling = true, antiafk = true}) end)
+        end,
+    }
+
+    GENRE.fighter = {
+        info = "Luta / PvP: orbitar alvo, hitbox, auto click, ESP e movimentacao. Combos e skills exigem teclas do proprio jogo.",
+        shooter = true,
+        custom = function(page)
+            UI.Section(page, "PVP")
+            UI.Button(page, "👊  Hitbox 10 + auto click", function() preset({hitbox = true, autoclick = true}, {hitbox_size = 10}) end)
+            UI.Button(page, "🌀  Speed 28 + Infinite Jump", function() preset({speed = true, infjump = true}, {speedv = 28}) end)
+            UI.Button(page, "🛡  Anti fling + anti void", function() preset({antifling = true, antivoid = true}) end)
+            UI.Button(page, "🎥  FOV 100 + zoom livre", function() preset({fovcam = true, zoom = true}, {fovcamv = 100}) end)
+        end,
+    }
+
+    GENRE.rpg = {
+        info = "RPG / anime: auto farm de NPC e boss (escolha qual na lista), coleta, baus e AFK. Skills especificas exigem os remotes do jogo.",
+        farm = true,
+        mobfarm = true,
+        groups = {
+            {"Bosses", {"boss"}}, {"Baus", {"chest", "crate"}}, {"NPCs / Quests", {"quest", "npc", "trainer"}},
+            {"Drops / Itens", {"drop", "item", "loot"}},
+        },
+        custom = function(page)
+            UI.Section(page, "RPG")
+            UI.Button(page, "⚔  Auto click + prompts instantaneos + anti AFK", function()
+                preset({autoclick = true, instaprompt = true, autoprompt = true, antiafk = true})
+            end)
+            UI.Button(page, "🏃  Speed seguro 26 + anti void", function() preset({speed = true, antivoid = true}, {speedv = 26}) end)
+            UI.Button(page, "💡  Fullbright + sem neblina", function() preset({fullbright = true, nofog = true}) end)
+        end,
+    }
+
+    GENRE.tower = {
+        info = "Tower defense: AFK longo, prompts automaticos e anti queda de conexao. Posicionar torres sozinho exige os remotes do jogo.",
+        farm = true,
+        groups = {{"Unidades / Torres", {"unit", "tower"}}, {"Inimigos", {"enemy", "mob", "zombie"}}, {"Baus / Drops", {"chest", "drop", "reward"}}},
+        custom = function(page)
+            UI.Section(page, "TOWER DEFENSE")
+            UI.Button(page, "🌙  AFK longo (anti AFK + auto rejoin + prompts)", function()
+                preset({antiafk = true, autorejoin = true, instaprompt = true, autoprompt = true})
+            end)
+            UI.Button(page, "🖥  Desligar renderizacao 3D (AFK, economiza PC)", function()
+                if Toggles.opt_3d then Toggles.opt_3d.Set(true) end
+            end)
+            UI.Button(page, "⚡  Boost leve de FPS", function()
+                preset({opt_shadow = true, opt_post = true, opt_fx = true})
+            end)
+        end,
+    }
+
+    GENRE.horror = {
+        info = "Terror / sobrevivencia: ESP de monstros, itens e saidas, alerta de perigo, fullbright e fuga.",
+        groups = {
+            {"Monstros", {"monster", "killer", "enemy", "piggy", "ghost", "entity"}},
+            {"Itens / Chaves", {"key", "item", "tool", "battery", "medkit", "fuel"}}, {"Saidas / Portas", {"exit", "door", "gate", "escape"}},
+        },
+        custom = function(page)
+            local watching = false
+            UI.Section(page, "SOBREVIVENCIA")
+            UI.Toggle(page, "Avisar quando um monstro aparecer", false, function(on) watching = on end)
+            watchSpawn({"monster", "killer", "piggy", "entity", "ghost", "enemy"}, "Perigo!", function() return watching end, "err")
+            UI.Button(page, "👁  ESP de monstros + itens + saidas", function()
+                espWords({"monster", "killer", "piggy", "entity", "key", "item", "exit", "door"})
+            end)
+            UI.Button(page, "💡  Fullbright + sem neblina", function() preset({fullbright = true, nofog = true}) end)
+            UI.Button(page, "🏃  Speed 24 + Infinite Jump + anti fling", function()
+                preset({speed = true, infjump = true, antifling = true}, {speedv = 24})
+            end)
+            UI.Button(page, "🧗  Esconder no ponto mais alto", function()
+                local part = highestPart(workspace)
+                if part then tpTo(Vector3.new(part.Position.X, part.Position.Y + part.Size.Y / 2 + 4, part.Position.Z)) end
+            end)
+        end,
+    }
+
+    GENRE.sports = {
+        info = "Esporte com bola: acha a bola e os gols pelo nome dos objetos; ajuste pelo SCANNER na aba MUNDO se precisar.",
+        explore = true,
+        groups = {{"Bola", {"ball", "bola"}}, {"Gols", {"goal", "trave"}}},
+        custom = soccerCustom,
+    }
+
+    GENRE.obby = {
+        info = "Obby / parkour: teletransporte ao topo, checkpoints, final, anti void e protecao de queda.",
+        groups = {{"Checkpoints", {"checkpoint", "stage", "spawn"}}, {"Final", {"finish", "win", "end"}}},
+        custom = function(page)
+            UI.Section(page, "OBBY")
+            UI.Button(page, "🏁  Ir ao topo (ponto mais alto)", function()
+                local part = highestPart(workspace)
+                if part then
+                    tpTo(Vector3.new(part.Position.X, part.Position.Y + part.Size.Y / 2 + 4, part.Position.Z))
+                    notify("Obby", "Teleportado ao ponto mais alto.", 3, "ok")
+                end
+            end)
+            UI.Button(page, "🎯  Ir ao final (parte finish / win)", function()
+                local p = nearestObj(function(d) return nameHas(d, {"finish", "win"}) end)
+                if p then tpTo(p.Position) else notify("Obby", "Final nao encontrado.", 3, "err") end
+            end)
+            UI.Button(page, "🚩  Ir ao checkpoint mais proximo", function()
+                local p = nearestObj(function(d) return nameHas(d, {"checkpoint", "stage"}) end)
+                if p then tpTo(p.Position) else notify("Obby", "Nenhum checkpoint.", 3, "err") end
+            end)
+            UI.Button(page, "🧗  Modo Escalada (speed 30 + infjump + gravidade baixa)", function()
+                preset({speed = true, infjump = true}, {speedv = 30})
+                workspace.Gravity = 60
+            end)
+            UI.Button(page, "🪂  Anti void + protecao de queda", function() preset({antivoid = true, fallguard = true}) end)
+            UI.Button(page, "🌍  Restaurar gravidade", function() workspace.Gravity = OrigGravity end)
+        end,
+    }
+
+    -- {nome, descricao, ids, palavras-chave (minusculas), genero}
+    local EXTRA = {
+        {"Pet Simulator X", "Auto farm, clicker, ovos, moedas e gemas", {6284583030}, {"pet simulator x", "pet sim x"}, "sim"},
+        {"Bubble Gum Simulator", "Auto farm, bolhas, moedas e ovos", {2512643572}, {"bubble gum simulator"}, "sim"},
+        {"Legends of Speed", "Auto coleta de orbs e gemas, speed e AFK", {3101667897}, {"legends of speed"}, "sim"},
+        {"Muscle Legends", "Auto click, farm AFK e anti queda", {}, {"muscle legends"}, "sim"},
+        {"Sol's RNG", "AFK farm, prompts e coleta de itens", {15532962292}, {"sol's rng", "sols rng"}, "sim"},
+        {"Ninja Legends", "Auto click, coleta de gemas e AFK", {3956818381}, {"ninja legends"}, "sim"},
+        {"Fish It", "AFK farm de pesca, prompts e clicker", {}, {"fish it"}, "sim"},
+        {"Plants vs Brainrots", "Colheita, prompts, moedas e AFK", {}, {"plants vs brainrots"}, "sim"},
+        {"Dragon Adventures", "Coleta, ESP de baus, ovos e AFK", {}, {"dragon adventures"}, "sim"},
+        {"Islands", "Coleta de recursos, ESP e AFK", {4872321990}, {"islands"}, "sim"},
+        {"Escape Tsunami For Brainrots", "Brainrots, coleta, speed e anti void", {}, {"tsunami for brainrots", "escape tsunami"}, "sim"},
+        {"Lumber Tycoon 2", "Auto compra, coleta de dinheiro, ESP e AFK", {13822889}, {"lumber tycoon"}, "tycoon"},
+        {"Theme Park Tycoon 2", "Auto compra, coleta de dinheiro e AFK", {69184822}, {"theme park tycoon"}, "tycoon"},
+        {"Car Dealership Tycoon", "Auto compra, dinheiro, carros e AFK", {1554960397}, {"car dealership tycoon"}, "tycoon"},
+        {"Restaurant Tycoon 2", "Auto compra, dinheiro e AFK", {}, {"restaurant tycoon"}, "tycoon"},
+        {"Welcome to Bloxburg", "Trabalhos automaticos, dinheiro e explorar", {185655149}, {"bloxburg"}, "tycoon"},
+        {"Work at a Pizza Place", "Trabalho automatico, dinheiro e explorar", {192800}, {"pizza place"}, "rp"},
+        {"MeepCity", "Explorar, brincadeiras, anti fling e coleta", {370731277}, {"meepcity", "meep city"}, "rp"},
+        {"Livetopia", "Roleplay: explorar, trabalhos e brincadeiras", {}, {"livetopia"}, "rp"},
+        {"Dress to Impress", "Social: explorar, brincadeiras e anti AFK", {15101393044}, {"dress to impress"}, "rp"},
+        {"Pls Donate", "Anti AFK, explorar e ferramentas de jogadores", {8737602449}, {"pls donate"}, "rp"},
+        {"Greenville", "Roleplay de carros: carros, explorar e trabalhos", {891852901}, {"greenville"}, "rp"},
+        {"Emergency Response: Liberty County", "Roleplay: carros, explorar e ESP", {7711635737}, {"liberty county", "emergency response"}, "rp"},
+        {"Driving Empire", "Corridas: speed, carros, dinheiro e checkpoints", {3351674303}, {"driving empire"}, "racing"},
+        {"Vehicle Simulator", "Veiculos: speed, carros e dinheiro", {171391948}, {"vehicle simulator"}, "racing"},
+        {"Mad City", "ESP, aimbot, carros, dinheiro e alertas", {1224212277}, {"mad city"}, "shooter"},
+        {"Criminality", "ESP, aimbot, presets e alertas de jogadores", {4588604953}, {"criminality"}, "shooter"},
+        {"Bad Business", "FPS: aimbot, ESP, trigger e alertas", {3233893879}, {"bad business"}, "shooter"},
+        {"Counter Blox", "FPS: aimbot, ESP, trigger e hitbox", {301549746}, {"counter blox"}, "shooter"},
+        {"Big Paintball", "FPS: aimbot, ESP e alertas", {3527629287}, {"big paintball"}, "shooter"},
+        {"Frontlines", "FPS: aimbot, ESP e alertas", {5938036553}, {"frontlines"}, "shooter"},
+        {"Rush Point", "FPS competitivo: presets, ESP e alertas", {}, {"rush point"}, "shooter"},
+        {"Untitled Hood", "Camlock, ESP, trigger e alertas", {}, {"untitled hood"}, "shooter"},
+        {"Murderers VS Sheriffs Duels", "Duelos: aimbot, ESP e trigger", {}, {"murderers vs sheriffs"}, "shooter"},
+        {"SkyWars", "ESP, aimbot, speed e anti void", {}, {"skywars"}, "shooter"},
+        {"Lucky Block Battlegrounds", "PvP: hitbox, ESP, orbitar alvo e speed", {}, {"lucky block battlegrounds"}, "fighter"},
+        {"Shindo Life", "Auto farm de NPC e boss, coleta e AFK", {4616652839}, {"shindo life"}, "rpg"},
+        {"Project Slayers", "Auto farm de NPC e boss, coleta e AFK", {5956785391}, {"project slayers"}, "rpg"},
+        {"King Legacy", "Auto farm de NPC e boss, frutas, baus e AFK", {4520749081}, {"king legacy"}, "rpg"},
+        {"Grand Piece Online", "Auto farm de NPC e boss, baus e AFK", {1730877806}, {"grand piece online"}, "rpg"},
+        {"Deepwoken", "ESP, NPCs, coleta e movimentacao", {4111023553}, {"deepwoken"}, "rpg"},
+        {"Type Soul", "Auto farm de NPC e boss, coleta e AFK", {14067600077}, {"type soul"}, "rpg"},
+        {"Your Bizarre Adventure", "Auto farm de NPC, itens, baus e AFK", {2809202155}, {"your bizarre adventure"}, "rpg"},
+        {"A Universal Time", "Auto farm de NPC, itens e AFK", {}, {"a universal time"}, "rpg"},
+        {"Jujutsu Infinite", "Auto farm de NPC e boss, coleta e AFK", {9391468976}, {"jujutsu infinite"}, "rpg"},
+        {"Ro-Ghoul", "Auto farm de NPC e boss, coleta e AFK", {914010731}, {"ro-ghoul", "ro ghoul"}, "rpg"},
+        {"Slap Royale", "PvP: hitbox, orbitar, ESP e speed", {}, {"slap royale"}, "fighter"},
+        {"Untitled Boxing Game", "PvP: ESP, orbitar alvo, speed e anti void", {}, {"untitled boxing"}, "fighter"},
+        {"SharkBite", "ESP, PvP, speed e anti void", {734159876}, {"sharkbite"}, "fighter"},
+        {"Anime Adventures", "AFK longo, prompts, baus e anti queda", {8304191830}, {"anime adventures"}, "tower"},
+        {"All Star Tower Defense", "AFK longo, prompts, baus e anti queda", {4646477729}, {"all star tower defense"}, "tower"},
+        {"Tower Defense Simulator", "AFK longo, prompts e anti queda", {3260590327}, {"tower defense simulator"}, "tower"},
+        {"Anime Vanguards", "AFK longo, prompts, baus e anti queda", {16146832113}, {"anime vanguards"}, "tower"},
+        {"Anime Last Stand", "AFK longo, prompts, baus e anti queda", {12886143095}, {"anime last stand"}, "tower"},
+        {"Anime Defenders", "AFK longo, prompts, baus e anti queda", {}, {"anime defenders"}, "tower"},
+        {"Piggy", "ESP do Piggy, itens, saidas e fuga", {4623386862}, {"piggy"}, "horror"},
+        {"Forsaken", "ESP de assassino, geradores, fuga e alertas", {18687417158}, {"forsaken"}, "horror"},
+        {"Evade", "ESP, speed, anti fling e fuga", {9872472334}, {"evade"}, "horror"},
+        {"Rainbow Friends", "ESP de monstros, itens, saidas e fuga", {7991339364}, {"rainbow friends"}, "horror"},
+        {"The Mimic", "ESP de monstros, itens, saidas e fuga", {6243699076}, {"the mimic"}, "horror"},
+        {"Break In", "ESP de vilao, itens, fuga e alertas", {}, {"break in"}, "horror"},
+        {"Hide and Seek Extreme", "ESP, esconderijos, speed e alertas", {205224386}, {"hide and seek"}, "horror"},
+        {"FIFA Super Soccer", "Bola, gols, seguir bola, auto chute e ESP", {12177325772}, {"fifa super soccer"}, "sports"},
+        {"Blue Lock Rivals", "Bola, gols, seguir bola, auto chute e ESP", {18668065416}, {"blue lock"}, "sports"},
+        {"Football Fusion 2", "Bola, gols, seguir bola, auto chute e ESP", {8204899140}, {"football fusion"}, "sports"},
+        {"Speed Run 4", "Obby: topo, final, checkpoints e anti void", {}, {"speed run 4"}, "obby"},
+        {"Mega Easy Obby", "Obby: topo, final, checkpoints e anti void", {}, {"mega easy obby"}, "obby"},
+    }
+    for _, e in ipairs(EXTRA) do
+        local g = GENRE[e[5]]
+        table.insert(Games, #Games, {
+            Name = e[1], Desc = e[2], Ids = e[3], Keys = e[4],
+            Build = builder({
+                info = g.info, infoH = 40, groups = g.groups, farm = g.farm, mobfarm = g.mobfarm,
+                shooter = g.shooter, explore = g.explore, nomove = g.nomove,
+                custom = function(page) g.custom(page, e) end,
+            }),
+        })
+    end
+
     local placeName = (game.Name or ""):lower()
     pcall(function()
         local info = MarketplaceService:GetProductInfo(game.PlaceId)
@@ -6302,7 +6816,13 @@ do
             showPage("Scripts", "Scripts")
         end)
         UI.Section(gamePage, string.upper(g.Name))
-        g.Build(gamePage)
+        local built = false
+        local function ensureBuilt()
+            if not built then
+                built = true
+                g.Build(gamePage)
+            end
+        end
 
         local isHere = isCurrentGame(g) and g.Name ~= "Universal"
         if isHere and not detected then
@@ -6393,6 +6913,7 @@ do
         card.MouseButton1Click:Connect(function()
             ripple(card)
             task.wait(0.12)
+            ensureBuilt()
             showPage(pageName, "Scripts")
         end)
 
